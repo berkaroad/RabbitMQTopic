@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net462</TargetFrameworks>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Authors>Jerry Bai</Authors>
+    <PackageProjectUrl>https://github.com/berkaroad/RabbitMQTopic</PackageProjectUrl>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Description>模拟RocketMQ的Topic方式的消息发送和接收。</Description>
+    <AssemblyName>RabbitMQTopic</AssemblyName>
+    <RootNamespace>RabbitMQTopic</RootNamespace>
+    <PackageId>RabbitMQTopic</PackageId>
+    <Version>1.0.1</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="RabbitMQ.Client" Version="5.0.1" />
+  </ItemGroup>
+
+</Project>
