@@ -42,6 +42,7 @@ var consumer1 = new Consumer(new ConsumerSettings
 {
     AmqpUri = new Uri("amqp://user:pwd@ip/vhost"),
     ClientName = "YourAppName",
+    PrefetchCount = 10，
     GroupName = "Group1",
     ConsumerCount = 2,
     ConsumerSequence = 1 // 将消费队列 0,2
@@ -55,6 +56,7 @@ var consumer2 = new Consumer(new ConsumerSettings
 {
     AmqpUri = new Uri("amqp://user:pwd@ip/vhost"),
     ClientName = "YourAppName",
+    PrefetchCount = 10，
     GroupName = "Group1",
     ConsumerCount = 2,
     ConsumerSequence = 2 // 将消费队列 1,3
