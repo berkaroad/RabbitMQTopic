@@ -41,6 +41,6 @@ namespace RabbitMQTopic
         /// <summary>
         /// 每个队列的预抓取消息数
         /// </summary>
-        public ushort PrefetchCount { get; set; }
+        public int PrefetchCount { get; set; }
     }
 }

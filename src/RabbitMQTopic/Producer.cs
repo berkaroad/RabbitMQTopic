@@ -1,5 +1,7 @@
 ﻿using RabbitMQ.Client;
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using IRabbitMQConnection = RabbitMQ.Client.IConnection;
 using RabbitMQConnectionFactory = RabbitMQ.Client.ConnectionFactory;
@@ -15,12 +17,18 @@ namespace RabbitMQTopic
         private string _clientName = null;
         private IRabbitMQConnection _amqpConnection = null;
         private bool _selfCreate = false;
+        private bool _delayedMessageEnabled = false;
+        private bool _autoConfig = false;
+        private ConcurrentDictionary<string, bool> _configuredTopics = new ConcurrentDictionary<string, bool>();
+        private object _locker = new object();
 
         /// <summary>
         /// 生产者
         /// </summary>
         /// <param name="settings"></param>
-        public Producer(ProducerSettings settings)
+        /// <param name="delayedMessageEnabled">延迟消息已启用（需启用插件 rabbitmq_delayed_message_exchange）</param>
+        /// <param name="autoConfig">自动建Exchange和Bind</param>
+        public Producer(ProducerSettings settings, bool delayedMessageEnabled = false, bool autoConfig = true)
         {
             if (settings == null)
             {
@@ -37,6 +45,8 @@ namespace RabbitMQTopic
                 _amqpConnection = settings.AmqpConnection;
                 _clientName = settings.AmqpConnection.ClientProvidedName;
             }
+            _delayedMessageEnabled = delayedMessageEnabled;
+            _autoConfig = autoConfig;
         }
 
         /// <summary>
@@ -92,6 +102,33 @@ namespace RabbitMQTopic
         {
             try
             {
+                if (_autoConfig)
+                {
+                    if (!_configuredTopics.ContainsKey(message.Topic))
+                    {
+                        lock (_locker)
+                        {
+                            if (!_configuredTopics.ContainsKey(message.Topic))
+                            {
+                                using (var channelForConfig = _amqpConnection.CreateModel())
+                                {
+                                    channelForConfig.ExchangeDeclare(message.Topic, ExchangeType.Fanout, true, false, null);
+                                    if (_delayedMessageEnabled)
+                                    {
+                                        channelForConfig.ExchangeDeclare($"{message.Topic}-delayed", "x-delayed-message", true, false, new Dictionary<string, object>
+                                        {
+                                            { "x-delayed-type", ExchangeType.Fanout }
+                                        });
+                                        channelForConfig.ExchangeBind(message.Topic, $"{message.Topic}-delayed", "", null);
+                                    }
+                                    channelForConfig.Close();
+                                }
+                                _configuredTopics.TryAdd(message.Topic, true);
+                            }
+                        }
+                    }
+                }
+
                 var realRoutingKey = string.IsNullOrEmpty(routingKey) ? "0" : ((uint)routingKey.GetHashCode() % message.QueueCount).ToString();
                 using (var channel = _amqpConnection.CreateModel())
                 {
@@ -102,9 +139,15 @@ namespace RabbitMQTopic
                     properties.MessageId = messageId;
                     properties.Type = message.Tag ?? string.Empty;
                     properties.Timestamp = new AmqpTimestamp(DateTime2UnixTime.ToUnixTime(message.CreatedTime));
-
+                    if (_delayedMessageEnabled && message.DelayedMillisecond > 0)
+                    {
+                        properties.Headers = new Dictionary<string, object>
+                        {
+                            { "x-delay", message.DelayedMillisecond }
+                        };
+                    }
                     channel.ConfirmSelect();
-                    channel.BasicPublish(exchange: message.Topic,
+                    channel.BasicPublish(exchange: _delayedMessageEnabled && message.DelayedMillisecond > 0 ? $"{message.Topic}-delayed" : message.Topic,
                                          routingKey: realRoutingKey,
                                          mandatory: true,
                                          basicProperties: properties,

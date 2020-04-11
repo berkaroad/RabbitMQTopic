@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>RabbitMQTopic</id>
+    <version>1.1.0</version>
+    <title>RabbitMQTopic</title>
+    <authors>Jerry Bai</authors>
+    <owners>Jerry Bai</owners>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <license type="expression">MIT</license>
+    <projectUrl>https://github.com/berkaroad/RabbitMQTopic</projectUrl>
+    <description>模拟RocketMQ的Topic方式的消息发送和接收。</description>
+    <releaseNotes>1）支持集群消费：相同消费组，不同消费者之间实现负载均衡，一个队列有且仅有一个消费者；
+2）支持广播消费：不同消费组，可以消费同一个消息；
+3）支持延迟消费，需启用插件 rabbitmq_delayed_message_exchange。</releaseNotes>
+    <copyright></copyright>
+    <language>zh-Hans</language>
+    <tags>rabbitmq mq rocketmq topic</tags>
+    <dependencies>
+      <group targetFramework=".NETFramework4.6.2">
+        <dependency id="RabbitMQ.Client" version="5.0.1" exclude="Build,Analyzers" />
+      </group>
+      <group targetFramework=".NETStandard2.0">
+        <dependency id="RabbitMQ.Client" version="5.0.1" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>

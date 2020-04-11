@@ -39,6 +39,11 @@ namespace RabbitMQTopic
         public string ContentType { get; set; }
 
         /// <summary>
+        /// 延迟毫秒数
+        /// </summary>
+        public int DelayedMillisecond { get; set; }
+
+        /// <summary>
         /// 创建时间（时间戳）
         /// </summary>
         public DateTime CreatedTime { get; set; }
@@ -57,8 +62,9 @@ namespace RabbitMQTopic
         /// <param name="body"></param>
         /// <param name="contentType"></param>
         /// <param name="tag"></param>
-        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, string tag = null)
-            : this(topic, queueCount, code, body, contentType, DateTime.Now, tag) { }
+        /// <param name="delayedMillisecond"></param>
+        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, string tag = null, int delayedMillisecond = 0)
+            : this(topic, queueCount, code, body, contentType, DateTime.Now, tag, delayedMillisecond) { }
 
         /// <summary>
         /// Topic消息
@@ -70,7 +76,8 @@ namespace RabbitMQTopic
         /// <param name="contentType"></param>
         /// <param name="createdTime"></param>
         /// <param name="tag"></param>
-        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, DateTime createdTime, string tag = null)
+        /// <param name="delayedMillisecond"></param>
+        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, DateTime createdTime, string tag = null, int delayedMillisecond = 0)
         {
             if (string.IsNullOrEmpty(topic))
             {
@@ -78,7 +85,7 @@ namespace RabbitMQTopic
             }
             if (queueCount <= 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(queueCount), queueCount,"QueueCount must greater than zero.");
+                throw new ArgumentOutOfRangeException(nameof(queueCount), queueCount, "QueueCount must greater than zero.");
             }
             if (code <= 0)
             {
@@ -90,11 +97,12 @@ namespace RabbitMQTopic
             }
             Topic = topic;
             QueueCount = queueCount;
-            Tag = tag;
             Code = code;
+            Tag = tag;
+            CreatedTime = createdTime;
+            DelayedMillisecond = delayedMillisecond;
             Body = body;
             ContentType = contentType;
-            CreatedTime = createdTime;
         }
 
         /// <summary>
@@ -103,7 +111,7 @@ namespace RabbitMQTopic
         /// <returns></returns>
         public override string ToString()
         {
-            return $"[Topic={Topic},QueueCount={QueueCount},Code={Code},Tag={Tag},CreatedTime={CreatedTime},BodyLength={Body.Length},ContentType={ContentType}]";
+            return $"[Topic={Topic},QueueCount={QueueCount},Code={Code},Tag={Tag},CreatedTime={CreatedTime},DelayedMillisecond={DelayedMillisecond},BodyLength={Body.Length},ContentType={ContentType}]";
         }
     }
 }

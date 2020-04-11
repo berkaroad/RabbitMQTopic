@@ -24,10 +24,11 @@ namespace RabbitMQTopic
         private string _groupName = null;
         private int _consumerCount = 0;
         private int _consumerSequence = 0;
+        private bool _autoConfig = false;
         private Dictionary<string, int> _topics = new Dictionary<string, int>();
         private ConcurrentDictionary<string, ConcurrentDictionary<byte, IModel>> _globalChannels = new ConcurrentDictionary<string, ConcurrentDictionary<byte, IModel>>();
         private ConcurrentDictionary<string, ConcurrentDictionary<byte, EventingBasicConsumer>> _globalConsumers = new ConcurrentDictionary<string, ConcurrentDictionary<byte, EventingBasicConsumer>>();
-        
+
         /// <summary>
         /// 消息已接受事件
         /// </summary>
@@ -37,7 +38,8 @@ namespace RabbitMQTopic
         /// 消费者
         /// </summary>
         /// <param name="settings"></param>
-        public Consumer(ConsumerSettings settings)
+        /// <param name="autoConfig">自动建Exchange、Queue和Bind</param>
+        public Consumer(ConsumerSettings settings, bool autoConfig = true)
         {
             if (settings == null)
             {
@@ -54,10 +56,11 @@ namespace RabbitMQTopic
                 _amqpConnection = settings.AmqpConnection;
                 _clientName = settings.AmqpConnection.ClientProvidedName;
             }
-            _prefetchCount = settings.PrefetchCount <= 0 ? (ushort)1 : settings.PrefetchCount;
+            _prefetchCount = settings.PrefetchCount <= 0 ? (ushort)1 : (ushort)settings.PrefetchCount;
             _groupName = string.IsNullOrEmpty(settings.GroupName) ? "default" : settings.GroupName;
             _consumerCount = settings.ConsumerCount <= 0 ? 1 : settings.ConsumerCount;
             _consumerSequence = settings.ConsumerSequence <= 0 || settings.ConsumerSequence > _consumerCount ? 1 : settings.ConsumerSequence;
+            _autoConfig = autoConfig;
         }
 
         /// <summary>
@@ -76,7 +79,7 @@ namespace RabbitMQTopic
                 throw new ArgumentOutOfRangeException(nameof(queueCount), queueCount, "QueueCount must greater than zero.");
             }
             if (!_topics.ContainsKey(topic))
-            {                
+            {
                 _topics.Add(topic, queueCount);
             }
         }
@@ -137,20 +140,23 @@ namespace RabbitMQTopic
                 var subTopic = $"{topic}.G.{_groupName}";
                 var consumers = new ConcurrentDictionary<byte, EventingBasicConsumer>();
                 var channels = new ConcurrentDictionary<byte, IModel>();
-                using (var channelForConfig = _amqpConnection.CreateModel())
+                if (_autoConfig)
                 {
-                    channelForConfig.ExchangeDeclare(topic, ExchangeType.Fanout, true, false, null);
-                    channelForConfig.ExchangeDeclare(subTopic, ExchangeType.Direct, true, false, null);
-                    channelForConfig.ExchangeBind(subTopic, topic, "", null);
-                    
-                    for (byte queueIndex = 0; queueIndex < queueCount; queueIndex++)
+                    using (var channelForConfig = _amqpConnection.CreateModel())
                     {
-                        string queueName = $"{subTopic}-{queueIndex}";
-                        channelForConfig.QueueDeclare(queueName, true, false, false, null);
-                        channelForConfig.QueueBind(queueName, subTopic, queueIndex.ToString(), null);
-                    }
+                        channelForConfig.ExchangeDeclare(topic, ExchangeType.Fanout, true, false, null);
+                        channelForConfig.ExchangeDeclare(subTopic, ExchangeType.Direct, true, false, null);
+                        channelForConfig.ExchangeBind(subTopic, topic, "", null);
 
-                    channelForConfig.Close();
+                        for (byte queueIndex = 0; queueIndex < queueCount; queueIndex++)
+                        {
+                            string queueName = $"{subTopic}-{queueIndex}";
+                            channelForConfig.QueueDeclare(queueName, true, false, false, null);
+                            channelForConfig.QueueBind(queueName, subTopic, queueIndex.ToString(), null);
+                        }
+
+                        channelForConfig.Close();
+                    }
                 }
 
                 if (!_globalChannels.TryAdd(subTopic, channels)
@@ -224,7 +230,7 @@ namespace RabbitMQTopic
                             var currentQueueIndex = channels.First(w => w.Value == currentChannel).Key;
                             var currentQueueName = $"{subTopic}-{currentQueueIndex}";
                         };
-                        
+
                         channel.BasicConsume($"{subTopic}-{queueIndex}", false, $"{_amqpConnection.ClientProvidedName}_consumer{queueIndex}", new Dictionary<string, object>(), consumer);
                     }
                     finally
@@ -246,7 +252,7 @@ namespace RabbitMQTopic
             {
                 for (byte queueIndex = 0; queueIndex < queueCount; queueIndex++)
                 {
-                    if (queueIndex % consumerCount == consumerSequence - 1) 
+                    if (queueIndex % consumerCount == consumerSequence - 1)
                     {
                         yield return queueIndex;
                     }
