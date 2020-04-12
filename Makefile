@@ -1,4 +1,8 @@
-all: pack
+all: test pack
+
+test:
+	dotnet run --project src/Samples/ProducerApp
+	dotnet run --project src/Samples/ConsumerApp
 
 pack: rebuild
 	rm -rf `pwd`/nuget/.DS_Store

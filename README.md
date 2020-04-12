@@ -21,9 +21,9 @@ dotnet add package RabbitMQTopic
 
 ## 用法
 
-消费者用法，见 [Demo.ConsumerApp](src/Demo.ConsumerApp/Program.cs)
+消费者用法，见 [ConsumerApp](src/Samples/ConsumerApp/Program.cs)
 
-生产者用法，见 [Demo.ProducerApp](src/Demo.ProducerApp/Program.cs)
+生产者用法，见 [ProducerApp](src/Samples/ProducerApp/Program.cs)
 
 ## Topic 与 RabbitMQ 的映射关系
 

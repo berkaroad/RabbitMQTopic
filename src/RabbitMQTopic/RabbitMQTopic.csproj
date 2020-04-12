@@ -6,10 +6,8 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>Jerry Bai</Authors>
     <PackageProjectUrl>https://github.com/berkaroad/RabbitMQTopic</PackageProjectUrl>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <Description>模拟RocketMQ的Topic方式的消息发送和接收。</Description>
-    <AssemblyName>RabbitMQTopic</AssemblyName>
-    <RootNamespace>RabbitMQTopic</RootNamespace>
     <PackageId>RabbitMQTopic</PackageId>
     <Version>1.0.0</Version>
   </PropertyGroup>

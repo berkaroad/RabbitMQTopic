@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\RabbitMQTopic\RabbitMQTopic.csproj" />
+    <ProjectReference Include="..\..\RabbitMQTopic\RabbitMQTopic.csproj" />
   </ItemGroup>
 
   <ItemGroup>

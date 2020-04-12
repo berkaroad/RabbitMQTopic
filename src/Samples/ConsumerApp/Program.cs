@@ -1,7 +1,8 @@
 ﻿using System;
+using System.Threading;
 using RabbitMQTopic;
 
-namespace Demo.ConsumerApp
+namespace ConsumerApp
 {
     class Program
     {
@@ -41,12 +42,13 @@ namespace Demo.ConsumerApp
 
             consumer1.Start();
             consumer2.Start();
-
             Console.WriteLine("Consumer started!");
-            Console.ReadLine();
 
+            Thread.Sleep(5000);
             consumer1.Shutdown();
+            Console.WriteLine("Consumer1 shutdown!");
             consumer2.Shutdown();
+            Console.WriteLine("Consumer2 shutdown!");
         }
     }
 }
