@@ -25,6 +25,16 @@ dotnet add package RabbitMQTopic
 
 生产者用法，见 [ProducerApp](src/Samples/ProducerApp/Program.cs)
 
+## 性能测试
+
+性能测试，见 [PerformanceTests](src/Samples/PerformanceTests/Program.cs)
+
+```
+Send message completed, time spent: 12369ms, throughput: 808 transactions per second.
+
+Consume message completed, time spent: 225ms, throughput: 39008 transactions per second.
+```
+
 ## Topic 与 RabbitMQ 的映射关系
 
 Consumer 启动后，如果设置的autoConfig为true，则会自动创建Exchange、Queue和Bind；
@@ -80,7 +90,7 @@ ExchangeBind("<TopicName>", "<TopicName>-delayed", "");
 
 ## 发布历史
 
-### 1.1.1
+### 1.1.2
 
 1）支持延迟消息，需启用插件 rabbitmq_delayed_message_exchange；
 

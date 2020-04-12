@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\RabbitMQTopic\RabbitMQTopic.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="rabbitmq.client" Version="5.1.2" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+  </PropertyGroup>
+
+</Project>

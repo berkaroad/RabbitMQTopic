@@ -20,8 +20,8 @@ namespace RabbitMQTopic
         private bool _delayedMessageEnabled = false;
         private bool _autoConfig = false;
         private ConcurrentDictionary<string, bool> _configuredTopics = new ConcurrentDictionary<string, bool>();
-        private object _locker = new object();
-
+        private object _configLocker = new object();
+        
         /// <summary>
         /// 生产者
         /// </summary>
@@ -85,9 +85,12 @@ namespace RabbitMQTopic
         /// </summary>
         public void Shutdown()
         {
-            if (_amqpConnection != null && _selfCreate)
+            if (_amqpConnection != null)
             {
-                _amqpConnection.Close();
+                if (_selfCreate)
+                {
+                    _amqpConnection.Close();
+                }
                 _amqpConnection = null;
             }
         }
@@ -99,12 +102,10 @@ namespace RabbitMQTopic
         /// <param name="routingKey"></param>
         /// <param name="messageId"></param>
         /// <returns></returns>
-        public async Task SendMessageAsync(TopicMessage message, string routingKey, string messageId)
+        public Task SendMessageAsync(TopicMessage message, string routingKey, string messageId)
         {
-            await Task.Run(() =>
-            {
-                SendMessage(message, routingKey, messageId);
-            });
+            new Task(() => SendMessage(message, routingKey, messageId), TaskCreationOptions.LongRunning).Start();
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -115,38 +116,17 @@ namespace RabbitMQTopic
         /// <param name="messageId"></param>
         public void SendMessage(TopicMessage message, string routingKey, string messageId)
         {
+            if (message == null)
+            {
+                throw new ArgumentNullException(nameof(message));
+            }
             try
             {
-                if (_autoConfig)
-                {
-                    if (!_configuredTopics.ContainsKey(message.Topic))
-                    {
-                        lock (_locker)
-                        {
-                            if (!_configuredTopics.ContainsKey(message.Topic))
-                            {
-                                using (var channelForConfig = _amqpConnection.CreateModel())
-                                {
-                                    channelForConfig.ExchangeDeclare(message.Topic, ExchangeType.Fanout, true, false, null);
-                                    if (_delayedMessageEnabled)
-                                    {
-                                        channelForConfig.ExchangeDeclare($"{message.Topic}-delayed", "x-delayed-message", true, false, new Dictionary<string, object>
-                                        {
-                                            { "x-delayed-type", ExchangeType.Fanout }
-                                        });
-                                        channelForConfig.ExchangeBind(message.Topic, $"{message.Topic}-delayed", "", null);
-                                    }
-                                    channelForConfig.Close();
-                                }
-                                _configuredTopics.TryAdd(message.Topic, true);
-                            }
-                        }
-                    }
-                }
-
+                Config(message.Topic);
                 var realRoutingKey = string.IsNullOrEmpty(routingKey) ? "0" : ((uint)routingKey.GetHashCode() % message.QueueCount).ToString();
                 using (var channel = _amqpConnection.CreateModel())
                 {
+                    channel.ConfirmSelect();
                     var properties = channel.CreateBasicProperties();
                     properties.Persistent = true;
                     properties.DeliveryMode = 2;
@@ -161,7 +141,6 @@ namespace RabbitMQTopic
                             { "x-delay", message.DelayedMillisecond }
                         };
                     }
-                    channel.ConfirmSelect();
                     channel.BasicPublish(exchange: _delayedMessageEnabled && message.DelayedMillisecond > 0 ? $"{message.Topic}-delayed" : message.Topic,
                                          routingKey: realRoutingKey,
                                          mandatory: true,
@@ -173,6 +152,36 @@ namespace RabbitMQTopic
             catch (Exception ex)
             {
                 throw new System.IO.IOException("Send message has exception.", ex);
+            }
+        }
+
+        private void Config(string topic)
+        {
+            if (_autoConfig)
+            {
+                if (!_configuredTopics.ContainsKey(topic))
+                {
+                    lock (_configLocker)
+                    {
+                        if (!_configuredTopics.ContainsKey(topic))
+                        {
+                            using (var channelForConfig = _amqpConnection.CreateModel())
+                            {
+                                channelForConfig.ExchangeDeclare(topic, ExchangeType.Fanout, true, false, null);
+                                if (_delayedMessageEnabled)
+                                {
+                                    channelForConfig.ExchangeDeclare($"{topic}-delayed", "x-delayed-message", true, false, new Dictionary<string, object>
+                                    {
+                                        { "x-delayed-type", ExchangeType.Fanout }
+                                    });
+                                    channelForConfig.ExchangeBind(topic, $"{topic}-delayed", "", null);
+                                }
+                                channelForConfig.Close();
+                            }
+                            _configuredTopics.TryAdd(topic, true);
+                        }
+                    }
+                }
             }
         }
     }

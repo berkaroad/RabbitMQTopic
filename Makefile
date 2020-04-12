@@ -1,8 +1,11 @@
-all: test pack
+all: pack
 
 test:
 	dotnet run --project src/Samples/ProducerApp
 	dotnet run --project src/Samples/ConsumerApp
+
+perf:
+	dotnet run --project src/Samples/PerformanceTests
 
 pack: rebuild
 	rm -rf `pwd`/nuget/.DS_Store
