@@ -74,10 +74,10 @@ ExchangeBind("<TopicName>", "<TopicName>-delayed", "");
 
 ## 用法
 
-消费者用法，见 [Demo.ConsumerApp]("/tree/master/src/Demo.ConsumerApp")
+消费者用法，见 [Demo.ConsumerApp]("/src/Demo.ConsumerApp")
 
 
-生产者用法，见 [Demo.Producer]("/tree/master/src/Demo.ProducerApp")
+生产者用法，见 [Demo.Producer]("/src/Demo.ProducerApp")
 
 ## 发布历史
 
