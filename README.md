@@ -74,9 +74,9 @@ ExchangeBind("<TopicName>", "<TopicName>-delayed", "");
 
 ## 用法
 
-消费者用法，见[Demo.ConsumerApp]("https://github.com/berkaroad/RabbitMQTopic/tree/master/src/Demo.ConsumerApp")
+消费者用法，见 [Demo.ConsumerApp]("https://github.com/berkaroad/RabbitMQTopic/tree/master/src/Demo.ConsumerApp")
 
-生产者用法，见[Demo.Producer]("https://github.com/berkaroad/RabbitMQTopic/tree/master/src/Demo.ProducerApp")
+生产者用法，见 [Demo.Producer]("https://github.com/berkaroad/RabbitMQTopic/tree/master/src/Demo.ProducerApp")
 
 ## 发布历史
 
