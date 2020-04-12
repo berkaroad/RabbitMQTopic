@@ -88,7 +88,7 @@ namespace RabbitMQTopic
         /// <param name="contentType"></param>
         /// <param name="delayedMillisecond"></param>
         /// <param name="tag"></param>
-        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, int delayedMillisecond = 0, string tag = null)
+        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, int delayedMillisecond, string tag = null)
             : this(topic, queueCount, code, body, contentType, DateTime.Now, delayedMillisecond, tag) { }
 
         /// <summary>
