@@ -38,8 +38,15 @@ namespace RabbitMQTopic
         /// 消费者
         /// </summary>
         /// <param name="settings"></param>
+        public Consumer(ConsumerSettings settings)
+            : this(settings, true) { }
+
+        /// <summary>
+        /// 消费者
+        /// </summary>
+        /// <param name="settings"></param>
         /// <param name="autoConfig">自动建Exchange、Queue和Bind</param>
-        public Consumer(ConsumerSettings settings, bool autoConfig = true)
+        public Consumer(ConsumerSettings settings, bool autoConfig)
         {
             if (settings == null)
             {

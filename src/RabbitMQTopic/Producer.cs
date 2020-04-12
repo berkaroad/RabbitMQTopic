@@ -26,9 +26,24 @@ namespace RabbitMQTopic
         /// 生产者
         /// </summary>
         /// <param name="settings"></param>
+        public Producer(ProducerSettings settings)
+            : this(settings, false, true) { }
+
+        /// <summary>
+        /// 生产者
+        /// </summary>
+        /// <param name="settings"></param>
+        /// <param name="delayedMessageEnabled">延迟消息已启用（需启用插件 rabbitmq_delayed_message_exchange）</param>
+        public Producer(ProducerSettings settings, bool delayedMessageEnabled)
+            : this(settings, delayedMessageEnabled, true) { }
+
+        /// <summary>
+        /// 生产者
+        /// </summary>
+        /// <param name="settings"></param>
         /// <param name="delayedMessageEnabled">延迟消息已启用（需启用插件 rabbitmq_delayed_message_exchange）</param>
         /// <param name="autoConfig">自动建Exchange和Bind</param>
-        public Producer(ProducerSettings settings, bool delayedMessageEnabled = false, bool autoConfig = true)
+        public Producer(ProducerSettings settings, bool delayedMessageEnabled, bool autoConfig)
         {
             if (settings == null)
             {

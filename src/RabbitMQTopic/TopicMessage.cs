@@ -62,9 +62,8 @@ namespace RabbitMQTopic
         /// <param name="body"></param>
         /// <param name="contentType"></param>
         /// <param name="tag"></param>
-        /// <param name="delayedMillisecond"></param>
-        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, string tag = null, int delayedMillisecond = 0)
-            : this(topic, queueCount, code, body, contentType, DateTime.Now, tag, delayedMillisecond) { }
+        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, string tag = null)
+            : this(topic, queueCount, code, body, contentType, DateTime.Now, 0, tag) { }
 
         /// <summary>
         /// Topic消息
@@ -76,8 +75,34 @@ namespace RabbitMQTopic
         /// <param name="contentType"></param>
         /// <param name="createdTime"></param>
         /// <param name="tag"></param>
+        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, DateTime createdTime, string tag = null)
+            : this(topic, queueCount, code, body, contentType, createdTime, 0, tag) { }
+
+        /// <summary>
+        /// Topic消息
+        /// </summary>
+        /// <param name="topic"></param>
+        /// <param name="queueCount"></param>
+        /// <param name="code"></param>
+        /// <param name="body"></param>
+        /// <param name="contentType"></param>
         /// <param name="delayedMillisecond"></param>
-        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, DateTime createdTime, string tag = null, int delayedMillisecond = 0)
+        /// <param name="tag"></param>
+        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, int delayedMillisecond = 0, string tag = null)
+            : this(topic, queueCount, code, body, contentType, DateTime.Now, delayedMillisecond, tag) { }
+
+        /// <summary>
+        /// Topic消息
+        /// </summary>
+        /// <param name="topic"></param>
+        /// <param name="queueCount"></param>
+        /// <param name="code"></param>
+        /// <param name="body"></param>
+        /// <param name="contentType"></param>
+        /// <param name="createdTime"></param>
+        /// <param name="delayedMillisecond"></param>
+        /// <param name="tag"></param>
+        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, DateTime createdTime, int delayedMillisecond, string tag = null)
         {
             if (string.IsNullOrEmpty(topic))
             {

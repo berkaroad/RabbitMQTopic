@@ -6,7 +6,7 @@
 
 2）支持广播消费：不同消费组，可以消费同一个消息；
 
-3）支持延迟消费，需启用插件 rabbitmq_delayed_message_exchange。
+3）支持延迟消息，需启用插件 rabbitmq_delayed_message_exchange。
 
 ## 安装
 ```
@@ -74,102 +74,15 @@ ExchangeBind("<TopicName>", "<TopicName>-delayed", "");
 
 ## 用法
 
-```csharp
-// 生产者
-using System;
-using RabbitMQTopic;
+消费者用法，见[Demo.ConsumerApp]("https://github.com/berkaroad/RabbitMQTopic/tree/master/src/Demo.ConsumerApp")
 
-namespace Demo.ProducerApp
-{
-    class Program
-    {
-        static void Main(string[] args)
-        {
-            var producer = new Producer(new ProducerSettings
-            {
-                AmqpUri = new Uri("amqp://demo:123456@localhost/test"),
-                ClientName = "ProducerApp"
-            }, delayedMessageEnabled: true);
-
-            producer.Start();
-            var random = new Random();
-            for (var i = 1; i <= 10; i++)
-            {
-                var messageId = Guid.NewGuid().ToString();
-                var routingKey = Guid.NewGuid().ToString();
-                var body = System.Text.Encoding.UTF8.GetBytes($"{i} delayed message {messageId}");
-                var topicMessage = new TopicMessage("CommandTopic", 4, 1, body, "text/json", "System.String", delayedMillisecond: 1000 * random.Next(5, 10));
-                producer.SendMessage(topicMessage, routingKey, messageId);
-            }
-            Console.WriteLine("Producer started!");
-            Console.ReadLine();
-            producer.Shutdown();
-        }
-    }
-}
-```
-
-```csharp
-// 消费者
-using System;
-using RabbitMQTopic;
-
-namespace Demo.ConsumerApp
-{
-    class Program
-    {
-        static void Main(string[] args)
-        {
-            var consumer1 = new Consumer(new ConsumerSettings
-            {
-                AmqpUri = new Uri("amqp://demo:123456@localhost/test"),
-                ClientName = "Consumer1App",
-                PrefetchCount = 10,
-                GroupName = "Group1",
-                ConsumerCount = 2,
-                ConsumerSequence = 1 // 将消费队列 0,2
-            });
-            consumer1.OnMessageReceived += (sender, e) =>
-            {
-                Console.WriteLine($"consumer1:{System.Text.Encoding.UTF8.GetString(e.Context.GetBody())}");
-                e.Context.Ack();
-            };
-            var consumer2 = new Consumer(new ConsumerSettings
-            {
-                AmqpUri = new Uri("amqp://demo:123456@localhost/test"),
-                ClientName = "Consumer2App",
-                PrefetchCount = 10,
-                GroupName = "Group1",
-                ConsumerCount = 2,
-                ConsumerSequence = 2 // 将消费队列 1,3
-            });
-            consumer2.OnMessageReceived += (sender, e) =>
-            {
-                Console.WriteLine($"consumer2:{System.Text.Encoding.UTF8.GetString(e.Context.GetBody())}");
-                e.Context.Ack();
-            };
-
-            consumer1.Subscribe("CommandTopic", 4);
-            consumer2.Subscribe("CommandTopic", 4);
-
-            consumer1.Start();
-            consumer2.Start();
-
-            Console.WriteLine("Consumer started!");
-            Console.ReadLine();
-
-            consumer1.Shutdown();
-            consumer2.Shutdown();
-        }
-    }
-}
-```
+生产者用法，见[Demo.Producer]("https://github.com/berkaroad/RabbitMQTopic/tree/master/src/Demo.ProducerApp")
 
 ## 发布历史
 
-### 1.1
+### 1.1.1
 
-1）支持延迟消费，需启用插件 rabbitmq_delayed_message_exchange；
+1）支持延迟消息，需启用插件 rabbitmq_delayed_message_exchange；
 
 2）Producer、Consumer初始化时，增加autoConfig参数，仅为true时才会配置Exchange、Queue和Bind。
 
