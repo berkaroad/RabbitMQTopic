@@ -30,9 +30,9 @@ dotnet add package RabbitMQTopic
 性能测试，见 [PerformanceTests](src/Samples/PerformanceTests/Program.cs)
 
 ```
-Send message completed, time spent: 12369ms, throughput: 808 transactions per second.
+Send message completed, time spent: 12774ms, throughput: 782 transactions per second.
 
-Consume message completed, time spent: 225ms, throughput: 39008 transactions per second.
+Consume message completed, time spent: 297ms, throughput: 30228 transactions per second.
 ```
 
 ## Topic 与 RabbitMQ 的映射关系
@@ -90,7 +90,7 @@ ExchangeBind("<TopicName>", "<TopicName>-delayed", "");
 
 ## 发布历史
 
-### 1.1.2
+### 1.1.3
 
 1）支持延迟消息，需启用插件 rabbitmq_delayed_message_exchange；
 

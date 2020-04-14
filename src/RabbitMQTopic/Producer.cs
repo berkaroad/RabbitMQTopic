@@ -104,8 +104,7 @@ namespace RabbitMQTopic
         /// <returns></returns>
         public Task SendMessageAsync(TopicMessage message, string routingKey, string messageId)
         {
-            new Task(() => SendMessage(message, routingKey, messageId), TaskCreationOptions.LongRunning).Start();
-            return Task.CompletedTask;
+            return Task.Factory.StartNew(() => SendMessage(message, routingKey, messageId), TaskCreationOptions.LongRunning);
         }
 
         /// <summary>

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,7 +9,7 @@ namespace PerformanceTests
 {
     class Program
     {
-        static async Task Main(string[] args)
+        static void Main(string[] args)
         {
             var producer = new Producer(new ProducerSettings
             {
@@ -18,6 +19,7 @@ namespace PerformanceTests
 
             var random = new Random();
             var sendCount = 10000;
+            var sendTaskList = new List<Task>();
             var watch = Stopwatch.StartNew();
             producer.Start();
             for (var i = 0; i < sendCount; i++)
@@ -26,9 +28,9 @@ namespace PerformanceTests
                 var routingKey = Guid.NewGuid().ToString();
                 var body = System.Text.Encoding.UTF8.GetBytes($"{i} delayed message {messageId}");
                 var topicMessage = new TopicMessage("CommandTopic", 4, 1, body, "text/json", tag: "System.String");
-                await producer.SendMessageAsync(topicMessage, routingKey, messageId);
+                sendTaskList.Add(producer.SendMessageAsync(topicMessage, routingKey, messageId));
             }
-
+            Task.WaitAll(sendTaskList.ToArray());
             var spentTime = watch.ElapsedMilliseconds;
             Console.WriteLine(string.Empty);
             Console.WriteLine("Send message completed, time spent: {0}ms, throughput: {1} transactions per second.", spentTime, sendCount * 1000 / spentTime);
