@@ -6,7 +6,7 @@
     <title>RabbitMQTopic</title>
     <authors>Jerry Bai</authors>
     <owners>Jerry Bai</owners>
-    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <license type="expression">MIT</license>
     <projectUrl>https://github.com/berkaroad/RabbitMQTopic</projectUrl>
     <description>模拟RocketMQ的Topic方式的消息发送和接收，支持集群消费、广播消费、延迟消息。</description>
