@@ -1,4 +1,5 @@
-﻿using System;
+﻿using RabbitMQTopic.Internals;
+using System;
 
 namespace RabbitMQTopic
 {

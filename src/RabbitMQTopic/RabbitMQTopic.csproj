@@ -1,15 +1,28 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;net462</TargetFrameworks>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>Jerry Bai</Authors>
     <PackageProjectUrl>https://github.com/berkaroad/RabbitMQTopic</PackageProjectUrl>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-    <Description>模拟RocketMQ的Topic方式的消息发送和接收。</Description>
     <PackageId>RabbitMQTopic</PackageId>
-    <Version>1.1.3</Version>
+    <Version>1.2.0</Version>
+    <AssemblyVersion>1.2.0</AssemblyVersion>
+    <PackageTags>rabbitmq mq rocketmq topic</PackageTags>
+    <Description>模拟RocketMQ的Topic方式的消息发送和接收。</Description>
+    <PackageReleaseNotes>1）TopicMessage更名为Message，取消属性QueueCount，更名DelayedMillisecond为DelayedMilliseconds；
+2）Producer启动前，需先注册Topic，仅注册过Topic的才可以发送消息；
+3）优化Producer配置Topic的逻辑，由原先伴随SendMessage，改为Start的时候；
+4）Producer发送消息时，增加返回类型SendResult；
+5）ProducerSettings，增加配置SendMsgTimeout，用于发送确认超时设置，默认3秒；
+6）增加Producer和Consumer是否运行的逻辑验证；
+7）路由Hash算法，改为Crc16算法；
+8）IMessageTransportationContext 属性ExchangeName改为Topic，属性QueueName改为QueueIndex；
+9）增加Pull模式。
+    </PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

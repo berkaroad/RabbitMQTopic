@@ -1,4 +1,4 @@
-﻿namespace RabbitMQTopic
+﻿namespace RabbitMQTopic.Internals
 {
     /// <summary>
     /// 消息属性常量

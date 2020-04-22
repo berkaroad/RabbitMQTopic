@@ -8,14 +8,19 @@ namespace RabbitMQTopic
     public interface IMessageTransportationContext
     {
         /// <summary>
-        /// 交换器名
+        /// Topic
         /// </summary>
-        string ExchangeName { get; }
+        string Topic { get; }
 
         /// <summary>
-        /// 队列名
+        /// 队列索引
         /// </summary>
-        string QueueName { get; }
+        int QueueIndex { get; }
+
+        /// <summary>
+        /// 消费组名
+        /// </summary>
+        string GroupName{get;}
 
         /// <summary>
         /// DeliveryTag

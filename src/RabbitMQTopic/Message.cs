@@ -3,10 +3,10 @@
 namespace RabbitMQTopic
 {
     /// <summary>
-    /// Topic消息
+    /// 消息
     /// </summary>
     [Serializable]
-    public class TopicMessage
+    public class Message
     {
         /// <summary>
         /// Topic（对应Exchange）
@@ -14,19 +14,19 @@ namespace RabbitMQTopic
         public string Topic { get; set; }
 
         /// <summary>
-        /// 队列个数
+        /// 代码（消息类别）
         /// </summary>
-        public int QueueCount { get; set; }
+        public int Code { get; set; }
+
+        /// <summary>
+        /// 创建时间（时间戳）
+        /// </summary>
+        public DateTime CreatedTime { get; set; }
 
         /// <summary>
         /// Tag标签（对应消息体的数据类型）
         /// </summary>
         public string Tag { get; set; }
-
-        /// <summary>
-        /// 代码（消息类别）
-        /// </summary>
-        public int Code { get; set; }
 
         /// <summary>
         /// 消息体
@@ -41,76 +41,63 @@ namespace RabbitMQTopic
         /// <summary>
         /// 延迟毫秒数
         /// </summary>
-        public int DelayedMillisecond { get; set; }
-
-        /// <summary>
-        /// 创建时间（时间戳）
-        /// </summary>
-        public DateTime CreatedTime { get; set; }
+        public int DelayedMilliseconds { get; set; }
 
         /// <summary>
         /// Topic消息
         /// </summary>
-        public TopicMessage() { }
+        public Message() { }
 
         /// <summary>
-        /// Topic消息
+        /// 消息
         /// </summary>
         /// <param name="topic"></param>
-        /// <param name="queueCount"></param>
         /// <param name="code"></param>
         /// <param name="body"></param>
         /// <param name="contentType"></param>
         /// <param name="tag"></param>
-        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, string tag = null)
-            : this(topic, queueCount, code, body, contentType, DateTime.Now, 0, tag) { }
+        public Message(string topic, int code, byte[] body, string contentType, string tag = null)
+            : this(topic, code, body, contentType, DateTime.Now, 0, tag) { }
 
         /// <summary>
-        /// Topic消息
+        /// 消息
         /// </summary>
         /// <param name="topic"></param>
-        /// <param name="queueCount"></param>
         /// <param name="code"></param>
         /// <param name="body"></param>
         /// <param name="contentType"></param>
         /// <param name="createdTime"></param>
         /// <param name="tag"></param>
-        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, DateTime createdTime, string tag = null)
-            : this(topic, queueCount, code, body, contentType, createdTime, 0, tag) { }
+        public Message(string topic, int code, byte[] body, string contentType, DateTime createdTime, string tag = null)
+            : this(topic, code, body, contentType, createdTime, 0, tag) { }
 
         /// <summary>
-        /// Topic消息
+        /// 消息
         /// </summary>
         /// <param name="topic"></param>
-        /// <param name="queueCount"></param>
         /// <param name="code"></param>
         /// <param name="body"></param>
         /// <param name="contentType"></param>
-        /// <param name="delayedMillisecond"></param>
+        /// <param name="delayedMilliseconds"></param>
         /// <param name="tag"></param>
-        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, int delayedMillisecond, string tag = null)
-            : this(topic, queueCount, code, body, contentType, DateTime.Now, delayedMillisecond, tag) { }
+        public Message(string topic, int code, byte[] body, string contentType, int delayedMilliseconds, string tag = null)
+            : this(topic, code, body, contentType, DateTime.Now, delayedMilliseconds, tag) { }
 
         /// <summary>
-        /// Topic消息
+        /// 消息
         /// </summary>
         /// <param name="topic"></param>
-        /// <param name="queueCount"></param>
         /// <param name="code"></param>
         /// <param name="body"></param>
         /// <param name="contentType"></param>
         /// <param name="createdTime"></param>
-        /// <param name="delayedMillisecond"></param>
+        /// <param name="delayedMilliseconds"></param>
         /// <param name="tag"></param>
-        public TopicMessage(string topic, int queueCount, int code, byte[] body, string contentType, DateTime createdTime, int delayedMillisecond, string tag = null)
+        public Message(string topic, int code, byte[] body, string contentType, DateTime createdTime, int delayedMilliseconds, string tag = null)
         {
             if (string.IsNullOrEmpty(topic))
             {
                 throw new ArgumentNullException(nameof(topic));
-            }
-            if (queueCount <= 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(queueCount), queueCount, "QueueCount must greater than zero.");
             }
             if (code <= 0)
             {
@@ -121,11 +108,10 @@ namespace RabbitMQTopic
                 throw new ArgumentNullException(nameof(body));
             }
             Topic = topic;
-            QueueCount = queueCount;
             Code = code;
             Tag = tag;
             CreatedTime = createdTime;
-            DelayedMillisecond = delayedMillisecond;
+            DelayedMilliseconds = delayedMilliseconds;
             Body = body;
             ContentType = contentType;
         }
@@ -136,7 +122,7 @@ namespace RabbitMQTopic
         /// <returns></returns>
         public override string ToString()
         {
-            return $"[Topic={Topic},QueueCount={QueueCount},Code={Code},Tag={Tag},CreatedTime={CreatedTime},DelayedMillisecond={DelayedMillisecond},BodyLength={Body.Length},ContentType={ContentType}]";
+            return $"[Topic={Topic},Code={Code},Tag={Tag},CreatedTime={CreatedTime},DelayedMilliseconds={DelayedMilliseconds},BodyLength={Body.Length},ContentType={ContentType}]";
         }
     }
 }

@@ -6,7 +6,9 @@
 
 2）支持广播消费：不同消费组，可以消费同一个消息；
 
-3）支持延迟消息，需启用插件 rabbitmq_delayed_message_exchange。
+3）支持延迟消息，需启用插件 rabbitmq_delayed_message_exchange；
+
+4）消费模式，同时支持Push模式和Pull模式（Pull模式下，未响应数超过此设置后，将暂停1秒拉取消息）。
 
 ## 安装
 ```
@@ -29,10 +31,14 @@ dotnet add package RabbitMQTopic
 
 性能测试，见 [PerformanceTests](src/Samples/PerformanceTests/Program.cs)
 
-```
-Send message completed, time spent: 12774ms, throughput: 782 transactions per second.
+以下数据，是在双核Mac笔记本上进行，dotnetcore和rabbitmq都在笔记本上，CPU消耗各占一半。
 
-Consume message completed, time spent: 297ms, throughput: 30228 transactions per second.
+```
+Send message completed, time spent: 110272ms, message count: 100000, throughput: 906tps.
+
+Consume message by push completed, time spent: 4399ms, message count: 52329, throughput: 11895tps.
+
+Consume message by pull completed, time spent: 8023ms, message count: 47674, throughput: 5942tps.
 ```
 
 ## Topic 与 RabbitMQ 的映射关系
@@ -89,6 +95,25 @@ ExchangeBind("<TopicName>", "<TopicName>-delayed", "");
 ```
 
 ## 发布历史
+
+### 1.2.0
+1）TopicMessage更名为Message，取消属性QueueCount，更名DelayedMillisecond为DelayedMilliseconds；
+
+2）Producer启动前，需先注册Topic，仅注册过Topic的才可以发送消息；
+
+3）优化Producer配置Topic的逻辑，由原先伴随SendMessage，改为Start的时候；
+
+4）Producer发送消息时，增加返回类型SendResult；
+
+5）ProducerSettings，增加配置SendMsgTimeout，用于发送确认超时设置，默认3秒；
+
+6）增加Producer和Consumer是否运行的逻辑验证；
+
+7）路由Hash算法，改为Crc16算法；
+
+8）IMessageTransportationContext 属性ExchangeName改为Topic，属性QueueName改为QueueIndex；
+
+9）增加Pull模式。
 
 ### 1.1.3
 

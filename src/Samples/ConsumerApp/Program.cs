@@ -26,7 +26,7 @@ namespace ConsumerApp
             {
                 AmqpUri = new Uri("amqp://demo:123456@localhost/test"),
                 ClientName = "Consumer2App",
-                PrefetchCount = 10,
+                Mode = ConsumeMode.Pull,
                 GroupName = "Group1",
                 ConsumerCount = 2,
                 ConsumerSequence = 2 // 将消费队列 1,3
@@ -44,7 +44,7 @@ namespace ConsumerApp
             consumer2.Start();
             Console.WriteLine("Consumer started!");
 
-            Thread.Sleep(5000);
+            Thread.Sleep(1000);
             consumer1.Shutdown();
             Console.WriteLine("Consumer1 shutdown!");
             consumer2.Shutdown();

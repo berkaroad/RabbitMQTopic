@@ -23,5 +23,9 @@ namespace RabbitMQTopic
         /// </summary>
         public IRabbitMQConnection AmqpConnection { get; set; }
 
+        /// <summary>
+        /// 发送消息超时时间（默认：3s）
+        /// </summary>
+        public int SendMsgTimeout { get; set; }
     }
 }

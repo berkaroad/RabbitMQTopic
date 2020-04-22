@@ -39,7 +39,12 @@ namespace RabbitMQTopic
         public int ConsumerSequence { get; set; }
 
         /// <summary>
-        /// 每个队列的预抓取消息数
+        /// 消费模式（默认：Push）
+        /// </summary>
+        public ConsumeMode Mode { get; set; }
+
+        /// <summary>
+        /// 每个队列的预抓取消息数（Pull模式下，未响应数超过此设置后，将暂停1秒后拉取消息）
         /// </summary>
         public int PrefetchCount { get; set; }
     }

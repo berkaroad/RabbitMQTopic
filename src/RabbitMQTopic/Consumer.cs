@@ -1,5 +1,6 @@
 ﻿using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using RabbitMQTopic.Internals;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -20,14 +21,16 @@ namespace RabbitMQTopic
         private string _clientName = null;
         private IRabbitMQConnection _amqpConnection = null;
         private bool _selfCreate = false;
+        private ConsumeMode _mode;
         private ushort _prefetchCount = 0;
         private string _groupName = null;
         private int _consumerCount = 0;
         private int _consumerSequence = 0;
         private bool _autoConfig = false;
         private Dictionary<string, int> _topics = new Dictionary<string, int>();
-        private ConcurrentDictionary<string, ConcurrentDictionary<byte, IModel>> _globalChannels = new ConcurrentDictionary<string, ConcurrentDictionary<byte, IModel>>();
+        private ConcurrentDictionary<string, ConcurrentDictionary<byte, Tuple<IModel, Thread>>> _globalChannels = new ConcurrentDictionary<string, ConcurrentDictionary<byte, Tuple<IModel, Thread>>>();
         private ConcurrentDictionary<string, ConcurrentDictionary<byte, EventingBasicConsumer>> _globalConsumers = new ConcurrentDictionary<string, ConcurrentDictionary<byte, EventingBasicConsumer>>();
+        private volatile int _isRunning = 0;
 
         /// <summary>
         /// 消息已接受事件
@@ -63,6 +66,7 @@ namespace RabbitMQTopic
                 _amqpConnection = settings.AmqpConnection;
                 _clientName = settings.AmqpConnection.ClientProvidedName;
             }
+            _mode = settings.Mode;
             _prefetchCount = settings.PrefetchCount <= 0 ? (ushort)1 : (ushort)settings.PrefetchCount;
             _groupName = string.IsNullOrEmpty(settings.GroupName) ? "default" : settings.GroupName;
             _consumerCount = settings.ConsumerCount <= 0 ? 1 : settings.ConsumerCount;
@@ -75,8 +79,13 @@ namespace RabbitMQTopic
         /// </summary>
         /// <param name="topic"></param>
         /// <param name="queueCount"></param>
-        public void Subscribe(string topic, int queueCount)
+        /// <return></return>
+        public Consumer Subscribe(string topic, int queueCount)
         {
+            if (_isRunning == 1)
+            {
+                throw new NotSupportedException("Couldn't subscribe topic when is running.");
+            }
             if (string.IsNullOrEmpty(topic))
             {
                 throw new ArgumentNullException(nameof(topic), "must not empty.");
@@ -89,6 +98,7 @@ namespace RabbitMQTopic
             {
                 _topics.Add(topic, queueCount);
             }
+            return this;
         }
 
         /// <summary>
@@ -96,6 +106,10 @@ namespace RabbitMQTopic
         /// </summary>
         public void Start()
         {
+            if (_isRunning == 1)
+            {
+                return;
+            }
             if (_amqpConnection == null)
             {
                 var connFactory = new RabbitMQConnectionFactory
@@ -105,7 +119,40 @@ namespace RabbitMQTopic
                 _amqpConnection = connFactory.CreateConnection(_clientName);
                 _selfCreate = true;
             }
-            StartSubscribe();
+            Interlocked.CompareExchange(ref _isRunning, 1, 0);
+
+            if (_autoConfig)
+            {
+                using (var channelForConfig = _amqpConnection.CreateModel())
+                {
+                    foreach (var topic in _topics.Keys)
+                    {
+                        var queueCount = _topics[topic];
+                        var subscribeQueues = GetSubscribeQueues(queueCount, _consumerCount, _consumerSequence);
+                        var subTopic = GetSubTopic(topic);
+                        channelForConfig.ExchangeDeclare(topic, ExchangeType.Fanout, true, false, null);
+                        channelForConfig.ExchangeDeclare(subTopic, ExchangeType.Direct, true, false, null);
+                        channelForConfig.ExchangeBind(subTopic, topic, "", null);
+
+                        for (byte queueIndex = 0; queueIndex < queueCount; queueIndex++)
+                        {
+                            string queueName = GetQueue(topic, queueIndex);
+                            channelForConfig.QueueDeclare(queueName, true, false, false, null);
+                            channelForConfig.QueueBind(queueName, subTopic, queueIndex.ToString(), null);
+                        }
+                    }
+                    channelForConfig.Close();
+                }
+            }
+
+            if (_mode == ConsumeMode.Push)
+            {
+                ConsumeByPush();
+            }
+            else
+            {
+                ConsumeByPull();
+            }
         }
 
         /// <summary>
@@ -113,22 +160,42 @@ namespace RabbitMQTopic
         /// </summary>
         public void Shutdown()
         {
+            if (_isRunning == 0)
+            {
+                return;
+            }
+            Interlocked.CompareExchange(ref _isRunning, 0, 1);
             if (_amqpConnection != null)
             {
-                foreach (var exchangeName in _globalChannels.Keys)
+                if (_mode == ConsumeMode.Push)
                 {
-                    var channels = _globalChannels[exchangeName];
-                    var consumers = _globalConsumers[exchangeName];
-                    foreach (var queueIndex in channels.Keys)
+                    foreach (var topic in _globalConsumers.Keys)
                     {
-                        var channel = channels[queueIndex];
-                        channel.Close(RabbitMQConstants.ConnectionForced, $"\"{exchangeName}-{queueIndex}\"'s normal channel disposed");
+                        var consumers = _globalConsumers[topic];
+                        foreach (var queueIndex in consumers.Keys)
+                        {
+                            var channel = consumers[queueIndex].Model;
+                            channel.Close(RabbitMQConstants.ConnectionForced, $"\"{topic}-{queueIndex}\"'s normal channel disposed");
+                        }
+                        consumers.Clear();
                     }
-                    channels.Clear();
-                    consumers.Clear();
+                    _globalConsumers.Clear();
                 }
-                _globalChannels.Clear();
-                _globalConsumers.Clear();
+                else
+                {
+                    foreach (var topic in _globalChannels.Keys)
+                    {
+                        var channels = _globalChannels[topic];
+                        foreach (var queueIndex in channels.Keys)
+                        {
+                            var channel = channels[queueIndex].Item1;
+                            var consumerThread = channels[queueIndex].Item2;
+                            channel.Close(RabbitMQConstants.ConnectionForced, $"\"{topic}-{queueIndex}\"'s normal channel disposed");
+                        }
+                        channels.Clear();
+                    }
+                    _globalChannels.Clear();
+                }
 
                 if (_selfCreate)
                 {
@@ -138,36 +205,25 @@ namespace RabbitMQTopic
             }
         }
 
-        private void StartSubscribe()
+        /// <summary>
+        /// 是否正在运行
+        /// </summary>
+        /// <value></value>
+        public bool IsRunning
+        {
+            get { return _isRunning == 1; }
+        }
+
+        private void ConsumeByPush()
         {
             foreach (var topic in _topics.Keys)
             {
                 var queueCount = _topics[topic];
                 var subscribeQueues = GetSubscribeQueues(queueCount, _consumerCount, _consumerSequence);
-                var subTopic = $"{topic}.G.{_groupName}";
+                var subTopic = GetSubTopic(topic);
                 var consumers = new ConcurrentDictionary<byte, EventingBasicConsumer>();
-                var channels = new ConcurrentDictionary<byte, IModel>();
-                if (_autoConfig)
-                {
-                    using (var channelForConfig = _amqpConnection.CreateModel())
-                    {
-                        channelForConfig.ExchangeDeclare(topic, ExchangeType.Fanout, true, false, null);
-                        channelForConfig.ExchangeDeclare(subTopic, ExchangeType.Direct, true, false, null);
-                        channelForConfig.ExchangeBind(subTopic, topic, "", null);
 
-                        for (byte queueIndex = 0; queueIndex < queueCount; queueIndex++)
-                        {
-                            string queueName = $"{subTopic}-{queueIndex}";
-                            channelForConfig.QueueDeclare(queueName, true, false, false, null);
-                            channelForConfig.QueueBind(queueName, subTopic, queueIndex.ToString(), null);
-                        }
-
-                        channelForConfig.Close();
-                    }
-                }
-
-                if (!_globalChannels.TryAdd(subTopic, channels)
-                    || !_globalConsumers.TryAdd(subTopic, consumers))
+                if (!_globalConsumers.TryAdd(subTopic, consumers))
                 {
                     throw new Exception($"{subTopic} has subscribed.");
                 }
@@ -183,12 +239,8 @@ namespace RabbitMQTopic
                     {
                         continue;
                     }
-                    channels.TryGetValue(queueIndex, out IModel channel);
-                    if (channel == null)
-                    {
-                        channel = _amqpConnection.CreateModel();
-                        channel.BasicQos(0, _prefetchCount, false);
-                    }
+                    var channel = _amqpConnection.CreateModel();
+                    channel.BasicQos(0, _prefetchCount, false);
                     consumer = new EventingBasicConsumer(channel);
 
                     try
@@ -197,16 +249,17 @@ namespace RabbitMQTopic
                         {
                             var currentConsumer = ((EventingBasicConsumer)sender);
                             var currentChannel = currentConsumer.Model;
-                            while (!channels.Any(w => w.Value == currentChannel))
+                            while (!consumers.Any(w => w.Value.Model == currentChannel))
                             {
-                                Thread.Sleep(10);
+                                Thread.Sleep(1000);
                             }
-                            var currentQueueIndex = channels.First(w => w.Value == currentChannel).Key;
-                            var currentQueueName = $"{subTopic}-{currentQueueIndex}";
+                            var currentQueueIndex = consumers.First(w => w.Value.Model == currentChannel).Key;
+                            var currentQueueName = GetQueue(topic, currentQueueIndex);
 
                             if (OnMessageReceived != null)
                             {
-                                var context = new MessageHandlingTransportationContext(e.Exchange, currentQueueName, channel, e.DeliveryTag, new Dictionary<string, object> {
+                                var currentTopic = e.Exchange.IndexOf("-delayed") > 0 ? e.Exchange.Substring(0, e.Exchange.LastIndexOf("-delayed")) : e.Exchange;
+                                var context = new MessageHandlingTransportationContext(currentTopic, currentQueueIndex, _groupName, channel, e.DeliveryTag, new Dictionary<string, object> {
                                     { MessagePropertyConstants.MESSAGE_ID, e.BasicProperties.MessageId },
                                     { MessagePropertyConstants.MESSAGE_TYPE, e.BasicProperties.Type },
                                     { MessagePropertyConstants.TIMESTAMP, e.BasicProperties.Timestamp.UnixTime == 0 ? DateTime.Now : DateTime2UnixTime.FromUnixTime(e.BasicProperties.Timestamp.UnixTime) },
@@ -214,7 +267,11 @@ namespace RabbitMQTopic
                                     { MessagePropertyConstants.BODY, e.Body },
                                     { MessagePropertyConstants.ROUTING_KEY, e.RoutingKey }
                                 });
-                                OnMessageReceived.Invoke(this, new MessageReceivedEventArgs(context));
+                                try
+                                {
+                                    OnMessageReceived.Invoke(this, new MessageReceivedEventArgs(context));
+                                }
+                                catch { }
                             }
                         };
 
@@ -228,25 +285,134 @@ namespace RabbitMQTopic
                             }
                             while (e.ReplyCode == RabbitMQConstants.ChannelError && !currentChannel.IsOpen)
                             {
-                                Thread.Sleep(10);
+                                Thread.Sleep(1000);
                             }
-                            while (!channels.Any(w => w.Value == currentChannel))
-                            {
-                                Thread.Sleep(10);
-                            }
-                            var currentQueueIndex = channels.First(w => w.Value == currentChannel).Key;
-                            var currentQueueName = $"{subTopic}-{currentQueueIndex}";
                         };
-
-                        channel.BasicConsume($"{subTopic}-{queueIndex}", false, $"{_amqpConnection.ClientProvidedName}_consumer{queueIndex}", new Dictionary<string, object>(), consumer);
+                        channel.BasicConsume(GetQueue(topic, queueIndex), false, $"{_amqpConnection.ClientProvidedName}_consumer{queueIndex}", new Dictionary<string, object>(), consumer);
                     }
                     finally
                     {
-                        channels.TryAdd(queueIndex, channel);
                         consumers.TryAdd(queueIndex, consumer);
                     }
                 }
             }
+        }
+
+        private void ConsumeByPull()
+        {
+            foreach (var topic in _topics.Keys)
+            {
+                var queueCount = _topics[topic];
+                var subscribeQueues = GetSubscribeQueues(queueCount, _consumerCount, _consumerSequence);
+                var subTopic = GetSubTopic(topic);
+                var channels = new ConcurrentDictionary<byte, Tuple<IModel, Thread>>();
+                if (!_globalChannels.TryAdd(subTopic, channels))
+                {
+                    throw new Exception($"{subTopic} has subscribed.");
+                }
+
+                for (byte queueIndex = 0; queueIndex < queueCount; queueIndex++)
+                {
+                    if (subscribeQueues == null || !subscribeQueues.Any(a => a == queueIndex))
+                    {
+                        continue;
+                    }
+                    channels.TryGetValue(queueIndex, out Tuple<IModel, Thread> channelTuple);
+                    if (channelTuple != null)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        var queueName = GetQueue(topic, queueIndex);
+                        var channel = _amqpConnection.CreateModel();
+                        var consumerThread = new Thread((state) =>
+                        {
+                            var currentChannelTopicQueueIndexPair = (Tuple<IModel, string, int>)state;
+                            var currentChannel = currentChannelTopicQueueIndexPair.Item1;
+                            var currentTopic = currentChannelTopicQueueIndexPair.Item2;
+                            var currentQueueIndex = currentChannelTopicQueueIndexPair.Item3;
+                            var currentQueueName = GetQueue(currentTopic, currentQueueIndex);
+                            int unackCount = 0;
+                            while (true)
+                            {
+                                if (!currentChannel.IsOpen)
+                                {
+                                    var closeReason = currentChannel.CloseReason;
+                                    if (closeReason.ReplyCode == RabbitMQConstants.ConnectionForced)
+                                    {
+                                        break;
+                                    }
+                                    if (closeReason.ReplyCode == RabbitMQConstants.ChannelError)
+                                    {
+                                        Thread.Sleep(1000);
+                                        continue;
+                                    }
+                                    else
+                                    {
+                                        throw new Exception($"{closeReason.ReplyText}");
+                                    }
+                                }
+                                if (OnMessageReceived == null)
+                                {
+                                    Thread.Sleep(1000);
+                                    continue;
+                                }
+                                if (unackCount > _prefetchCount)
+                                {
+                                    // 当消费堆积数，达到设定值后，将延迟1秒拉消息
+                                    Thread.Sleep(1000);
+                                }
+                                try
+                                {
+                                    var mqMessage = currentChannel.BasicGet(currentQueueName, false);
+                                    if (mqMessage == null)
+                                    {
+                                        Thread.Sleep(1000);
+                                        continue;
+                                    }
+
+                                    Interlocked.Increment(ref unackCount);
+                                    var context = new MessageHandlingTransportationContext(topic, currentQueueIndex, _groupName, currentChannel, mqMessage.DeliveryTag, new Dictionary<string, object> {
+                                        { MessagePropertyConstants.MESSAGE_ID, mqMessage.BasicProperties.MessageId },
+                                        { MessagePropertyConstants.MESSAGE_TYPE, mqMessage.BasicProperties.Type },
+                                        { MessagePropertyConstants.TIMESTAMP, mqMessage.BasicProperties.Timestamp.UnixTime == 0 ? DateTime.Now : DateTime2UnixTime.FromUnixTime(mqMessage.BasicProperties.Timestamp.UnixTime) },
+                                        { MessagePropertyConstants.CONTENT_TYPE, string.IsNullOrEmpty(mqMessage.BasicProperties.ContentType) ? "text/json" : mqMessage.BasicProperties.ContentType },
+                                        { MessagePropertyConstants.BODY, mqMessage.Body },
+                                        { MessagePropertyConstants.ROUTING_KEY, mqMessage.RoutingKey }
+                                    });
+                                    context.OnAck += (sender, e) => Interlocked.Decrement(ref unackCount);
+                                    OnMessageReceived.Invoke(this, new MessageReceivedEventArgs(context));
+                                    if (mqMessage.MessageCount == 0)
+                                    {
+                                        Thread.Sleep(1000);
+                                        continue;
+                                    }
+                                }
+                                catch { }
+                            }
+                        })
+                        { IsBackground = false };
+                        channelTuple = new Tuple<IModel, Thread>(channel, consumerThread);
+                        consumerThread.Start(new Tuple<IModel, string, int>(channel, topic, queueIndex));
+                    }
+                    finally
+                    {
+                        channels.TryAdd(queueIndex, channelTuple);
+                    }
+                }
+            }
+        }
+
+        private string GetSubTopic(string topic)
+        {
+            return $"{topic}.G.{_groupName}";
+        }
+
+        private string GetQueue(string topic, int queueIndex)
+        {
+            return $"{topic}.G.{_groupName}-{queueIndex}";
         }
 
         private IEnumerable<byte> GetSubscribeQueues(int queueCount, int consumerCount, int consumerSequence)

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace RabbitMQTopic
+namespace RabbitMQTopic.Internals
 {
     /// <summary>
     /// DateTime和UnixTime间互转
