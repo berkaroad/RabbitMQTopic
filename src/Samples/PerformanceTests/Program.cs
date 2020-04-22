@@ -38,7 +38,6 @@ namespace PerformanceTests
             Console.WriteLine(string.Empty);
             Console.WriteLine($"Send message completed, time spent: {spentTime}ms, message count: {messageCount}, throughput: {messageCount * 1000 / spentTime}tps.");
             Thread.Sleep(500);
-
             producer.Shutdown();
 
             var consumer = new Consumer(new ConsumerSettings
@@ -57,6 +56,7 @@ namespace PerformanceTests
             };
 
             consumer.Subscribe("CommandTopic", 4);
+            Thread.Sleep(500);
             watch.Restart();
             consumer.Start();
             while (consumeCount1 < messageCount / 2)
@@ -86,6 +86,7 @@ namespace PerformanceTests
             };
 
             consumer.Subscribe("CommandTopic", 4);
+            Thread.Sleep(500);
             watch.Restart();
             consumer.Start();
             while (consumeCount1 + consumeCount2 < messageCount)
