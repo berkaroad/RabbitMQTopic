@@ -96,6 +96,9 @@ ExchangeBind("<TopicName>", "<TopicName>-delayed", "");
 
 ## 发布历史
 
+### 1.2.1
+1）优化Pull模式，在空转情况下，平衡实时性和空转性能消耗。
+
 ### 1.2.0
 1）TopicMessage更名为Message，取消属性QueueCount，更名DelayedMillisecond为DelayedMilliseconds；
 

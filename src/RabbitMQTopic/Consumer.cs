@@ -335,6 +335,7 @@ namespace RabbitMQTopic
                             var currentQueueIndex = currentChannelTopicQueueIndexPair.Item3;
                             var currentQueueName = GetQueue(currentTopic, currentQueueIndex);
                             int unackCount = 0;
+                            int noMsgCount = 0;
                             while (true)
                             {
                                 if (!currentChannel.IsOpen)
@@ -369,10 +370,26 @@ namespace RabbitMQTopic
                                     var mqMessage = currentChannel.BasicGet(currentQueueName, false);
                                     if (mqMessage == null)
                                     {
-                                        Thread.Sleep(1000);
+                                        if (noMsgCount < 1000)
+                                        {
+                                            // 约10秒以内
+                                            Interlocked.Increment(ref noMsgCount);
+                                            Thread.Sleep(10);
+                                        }
+                                        else if (noMsgCount < 1500)
+                                        {
+                                            // 约1分钟以内
+                                            Interlocked.Increment(ref noMsgCount);
+                                            Thread.Sleep(100);
+                                        }
+                                        else
+                                        {
+                                            // 超过1分钟
+                                            Thread.Sleep(1000);
+                                        }
                                         continue;
                                     }
-
+                                    Interlocked.Exchange(ref noMsgCount, 0);
                                     Interlocked.Increment(ref unackCount);
                                     var context = new MessageHandlingTransportationContext(topic, currentQueueIndex, _groupName, currentChannel, mqMessage.DeliveryTag, new Dictionary<string, object> {
                                         { MessagePropertyConstants.MESSAGE_ID, mqMessage.BasicProperties.MessageId },
@@ -384,11 +401,6 @@ namespace RabbitMQTopic
                                     });
                                     context.OnAck += (sender, e) => Interlocked.Decrement(ref unackCount);
                                     OnMessageReceived.Invoke(this, new MessageReceivedEventArgs(context));
-                                    if (mqMessage.MessageCount == 0)
-                                    {
-                                        Thread.Sleep(1000);
-                                        continue;
-                                    }
                                 }
                                 catch { }
                             }
