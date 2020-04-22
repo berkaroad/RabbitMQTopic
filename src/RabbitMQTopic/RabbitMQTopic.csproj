@@ -9,6 +9,7 @@
     <PackageProjectUrl>https://github.com/berkaroad/RabbitMQTopic</PackageProjectUrl>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <PackageId>RabbitMQTopic</PackageId>
+    <Title>RabbitMQTopic</Title>
     <Version>1.2.0</Version>
     <AssemblyVersion>1.2.0</AssemblyVersion>
     <PackageTags>rabbitmq mq rocketmq topic</PackageTags>
