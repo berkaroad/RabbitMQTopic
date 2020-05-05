@@ -253,12 +253,11 @@ namespace RabbitMQTopic
                             {
                                 Thread.Sleep(1000);
                             }
-                            var currentQueueIndex = consumers.First(w => w.Value.Model == currentChannel).Key;
-                            var currentQueueName = GetQueue(topic, currentQueueIndex);
-
+                            
                             if (OnMessageReceived != null)
                             {
                                 var currentTopic = e.Exchange.IndexOf("-delayed") > 0 ? e.Exchange.Substring(0, e.Exchange.LastIndexOf("-delayed")) : e.Exchange;
+                                var currentQueueIndex = consumers.First(w => w.Value.Model == currentChannel).Key;
                                 var context = new MessageHandlingTransportationContext(currentTopic, currentQueueIndex, _groupName, channel, e.DeliveryTag, new Dictionary<string, object> {
                                     { MessagePropertyConstants.MESSAGE_ID, e.BasicProperties.MessageId },
                                     { MessagePropertyConstants.MESSAGE_TYPE, e.BasicProperties.Type },
