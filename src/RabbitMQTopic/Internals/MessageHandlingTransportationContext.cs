@@ -6,7 +6,8 @@ namespace RabbitMQTopic.Internals
 {
     internal class MessageHandlingTransportationContext : IMessageTransportationContext
     {
-        private IModel _channel;
+        private readonly IModel _channel;
+        private readonly ulong _deliveryTag;
 
         public MessageHandlingTransportationContext(string topic, int queueIndex, string groupName, IModel channel, ulong deliveryTag, IDictionary<string, object> properties)
         {
@@ -14,7 +15,7 @@ namespace RabbitMQTopic.Internals
             QueueIndex = queueIndex;
             GroupName = groupName;
             _channel = channel;
-            DeliveryTag = deliveryTag;
+            _deliveryTag = deliveryTag;
             Properties = properties;
         }
 
@@ -24,15 +25,13 @@ namespace RabbitMQTopic.Internals
 
         public string GroupName { get; private set; }
 
-        public ulong DeliveryTag { get; private set; }
-
         public IDictionary<string, object> Properties { get; private set; }
 
         public event EventHandler OnAck;
 
         public void Ack()
         {
-            _channel.BasicAck(DeliveryTag, false);
+            _channel.BasicAck(_deliveryTag, false);
             OnAck?.Invoke(this, new EventArgs());
         }
     }

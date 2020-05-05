@@ -20,12 +20,7 @@ namespace RabbitMQTopic
         /// <summary>
         /// 消费组名
         /// </summary>
-        string GroupName{get;}
-
-        /// <summary>
-        /// DeliveryTag
-        /// </summary>
-        ulong DeliveryTag { get; }
+        string GroupName { get; }
 
         /// <summary>
         /// 属性集合
