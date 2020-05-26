@@ -1,9 +1,11 @@
 ﻿using RabbitMQ.Client;
 using RabbitMQTopic.Internals;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using IRabbitMQChannel = RabbitMQ.Client.IModel;
 using IRabbitMQConnection = RabbitMQ.Client.IConnection;
 using RabbitMQConnectionFactory = RabbitMQ.Client.ConnectionFactory;
 
@@ -18,11 +20,14 @@ namespace RabbitMQTopic
         private string _clientName = null;
         private IRabbitMQConnection _amqpConnection = null;
         private TimeSpan _sendMsgTimeout = TimeSpan.FromSeconds(3);
+        private TimeSpan _maxIdleDuration = TimeSpan.FromSeconds(10);
+        private ConcurrentQueue<Tuple<DateTime, IRabbitMQChannel>> _channelPool;
         private bool _selfCreate = false;
         private bool _delayedMessageEnabled = false;
         private bool _autoConfig = false;
         private Dictionary<string, int> _topics = new Dictionary<string, int>();
         private volatile int _isRunning = 0;
+        private Timer _cleanIdleChannelTimer;
 
         /// <summary>
         /// 生产者
@@ -66,8 +71,14 @@ namespace RabbitMQTopic
             {
                 _sendMsgTimeout = TimeSpan.FromSeconds(settings.SendMsgTimeout);
             }
+            if (settings.MaxChannelIdleDuration > 0)
+            {
+                _maxIdleDuration = TimeSpan.FromSeconds(settings.MaxChannelIdleDuration);
+            }
             _delayedMessageEnabled = delayedMessageEnabled;
             _autoConfig = autoConfig;
+            _channelPool = new ConcurrentQueue<Tuple<DateTime, IRabbitMQChannel>>();
+            _cleanIdleChannelTimer = new Timer(ClearIdleChannel);
         }
 
         /// <summary>
@@ -102,39 +113,38 @@ namespace RabbitMQTopic
         /// </summary>
         public void Start()
         {
-            if (_isRunning == 1)
+            if (Interlocked.CompareExchange(ref _isRunning, 1, 0) == 0)
             {
-                return;
-            }
-            if (_amqpConnection == null)
-            {
-                var connFactory = new RabbitMQConnectionFactory
+                if (_amqpConnection == null)
                 {
-                    Uri = _amqpUri
-                };
-                _amqpConnection = connFactory.CreateConnection(_clientName);
-                _selfCreate = true;
-            }
-            Interlocked.CompareExchange(ref _isRunning, 1, 0);
-
-            if (_autoConfig)
-            {
-                foreach (var topic in _topics.Keys)
-                {
-                    using (var channelForConfig = _amqpConnection.CreateModel())
+                    var connFactory = new RabbitMQConnectionFactory
                     {
-                        channelForConfig.ExchangeDeclare(topic, ExchangeType.Fanout, true, false, null);
-                        if (_delayedMessageEnabled)
+                        Uri = _amqpUri
+                    };
+                    _amqpConnection = connFactory.CreateConnection(_clientName);
+                    _selfCreate = true;
+                }
+
+                if (_autoConfig)
+                {
+                    foreach (var topic in _topics.Keys)
+                    {
+                        using (var channelForConfig = _amqpConnection.CreateModel())
                         {
-                            channelForConfig.ExchangeDeclare($"{topic}-delayed", "x-delayed-message", true, false, new Dictionary<string, object>
+                            channelForConfig.ExchangeDeclare(topic, ExchangeType.Fanout, true, false, null);
+                            if (_delayedMessageEnabled)
+                            {
+                                channelForConfig.ExchangeDeclare($"{topic}-delayed", "x-delayed-message", true, false, new Dictionary<string, object>
                             {
                                 { "x-delayed-type", ExchangeType.Fanout }
                             });
-                            channelForConfig.ExchangeBind(topic, $"{topic}-delayed", "", null);
+                                channelForConfig.ExchangeBind(topic, $"{topic}-delayed", "", null);
+                            }
+                            channelForConfig.Close();
                         }
-                        channelForConfig.Close();
                     }
                 }
+                _cleanIdleChannelTimer.Change(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
             }
         }
 
@@ -143,18 +153,25 @@ namespace RabbitMQTopic
         /// </summary>
         public void Shutdown()
         {
-            if (_isRunning == 0)
+            if (Interlocked.CompareExchange(ref _isRunning, 0, 1) == 1)
             {
-                return;
-            }
-            Interlocked.CompareExchange(ref _isRunning, 0, 1);
-            if (_amqpConnection != null)
-            {
-                if (_selfCreate)
+                _cleanIdleChannelTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                Thread.Sleep(100);
+                while (_channelPool.TryDequeue(out Tuple<DateTime, IRabbitMQChannel> item))
                 {
-                    _amqpConnection.Close();
+                    if (item.Item2.IsOpen)
+                    {
+                        item.Item2.Close();
+                    }
                 }
-                _amqpConnection = null;
+                if (_amqpConnection != null)
+                {
+                    if (_selfCreate)
+                    {
+                        _amqpConnection.Close();
+                    }
+                    _amqpConnection = null;
+                }
             }
         }
 
@@ -198,44 +215,85 @@ namespace RabbitMQTopic
             {
                 return new SendResult(SendStatus.Failed, null, $"Topic {message.Topic} not registered.");
             }
+            IRabbitMQChannel channel = null;
             try
             {
                 var queueCount = _topics[message.Topic];
                 var queueId = string.IsNullOrEmpty(routingKey) ? 0 : (Crc16.GetHashCode(routingKey) % queueCount);
                 var messageId = Guid.NewGuid().ToString();
                 var createdTime = message.CreatedTime == DateTime.MinValue ? DateTime.Now : message.CreatedTime;
-                using (var channel = _amqpConnection.CreateModel())
+                if (_channelPool.TryDequeue(out Tuple<DateTime, IRabbitMQChannel> item))
                 {
-                    channel.ConfirmSelect();
-                    var properties = channel.CreateBasicProperties();
-                    properties.Persistent = true;
-                    properties.ContentType = message.ContentType ?? string.Empty;
-                    properties.MessageId = Guid.NewGuid().ToString();
-                    properties.Type = message.Tag ?? string.Empty;
-                    properties.Timestamp = new AmqpTimestamp(DateTime2UnixTime.ToUnixTime(createdTime));
-                    if (_delayedMessageEnabled && message.DelayedMilliseconds > 0)
-                    {
-                        properties.Headers = new Dictionary<string, object>
-                        {
-                            { "x-delay", message.DelayedMilliseconds }
-                        };
-                    }
-                    channel.BasicPublish(exchange: _delayedMessageEnabled && message.DelayedMilliseconds > 0 ? $"{message.Topic}-delayed" : message.Topic,
-                                         routingKey: queueId.ToString(),
-                                         mandatory: true,
-                                         basicProperties: properties,
-                                         body: message.Body);
-                    if (!channel.WaitForConfirms(_sendMsgTimeout, out bool timedOut))
-                    {
-                        return new SendResult(timedOut ? SendStatus.Timeout : SendStatus.Failed, null, "Wait for confirms failed.");
-                    }
-                    var storeResult = new MessageStoreResult(messageId, message.Code, message.Topic, queueId, createdTime, message.Tag);
-                    return new SendResult(SendStatus.Success, storeResult, null);
+                    channel = item.Item2;
                 }
+                else
+                {
+                    channel = _amqpConnection.CreateModel();
+                    channel.ConfirmSelect();
+                }
+                var properties = channel.CreateBasicProperties();
+                properties.Persistent = true;
+                properties.ContentType = message.ContentType ?? string.Empty;
+                properties.MessageId = Guid.NewGuid().ToString();
+                properties.Type = message.Tag ?? string.Empty;
+                properties.Timestamp = new AmqpTimestamp(DateTime2UnixTime.ToUnixTime(createdTime));
+                if (_delayedMessageEnabled && message.DelayedMilliseconds > 0)
+                {
+                    properties.Headers = new Dictionary<string, object>
+                    {
+                        { "x-delay", message.DelayedMilliseconds }
+                    };
+                }
+                channel.BasicPublish(exchange: _delayedMessageEnabled && message.DelayedMilliseconds > 0 ? $"{message.Topic}-delayed" : message.Topic,
+                                     routingKey: queueId.ToString(),
+                                     mandatory: true,
+                                     basicProperties: properties,
+                                     body: message.Body);
+                if (!channel.WaitForConfirms(_sendMsgTimeout, out bool timedOut))
+                {
+                    return new SendResult(timedOut ? SendStatus.Timeout : SendStatus.Failed, null, "Wait for confirms failed.");
+                }
+                var storeResult = new MessageStoreResult(messageId, message.Code, message.Topic, queueId, createdTime, message.Tag);
+                return new SendResult(SendStatus.Success, storeResult, null);
             }
             catch (Exception ex)
             {
                 throw new System.IO.IOException("Send message has exception.", ex);
+            }
+            finally
+            {
+                if (channel != null)
+                {
+                    _channelPool.Enqueue(new Tuple<DateTime, IRabbitMQChannel>(DateTime.Now, channel));
+                }
+            }
+        }
+
+        private void ClearIdleChannel(object state)
+        {
+            _cleanIdleChannelTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            try
+            {
+                if (_channelPool.TryPeek(out Tuple<DateTime, IRabbitMQChannel> item) && _isRunning == 1)
+                {
+                    if (item.Item1.Add(_maxIdleDuration) < DateTime.Now)
+                    {
+                        if (_channelPool.TryDequeue(out Tuple<DateTime, IRabbitMQChannel> removedItem))
+                        {
+                            if (removedItem.Item2.IsOpen)
+                            {
+                                removedItem.Item2.Close();
+                            }
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                if (_isRunning == 1)
+                {
+                    _cleanIdleChannelTimer.Change(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+                }
             }
         }
     }

@@ -106,52 +106,50 @@ namespace RabbitMQTopic
         /// </summary>
         public void Start()
         {
-            if (_isRunning == 1)
+            if (Interlocked.CompareExchange(ref _isRunning, 1, 0) == 0)
             {
-                return;
-            }
-            if (_amqpConnection == null)
-            {
-                var connFactory = new RabbitMQConnectionFactory
+                if (_amqpConnection == null)
                 {
-                    Uri = _amqpUri
-                };
-                _amqpConnection = connFactory.CreateConnection(_clientName);
-                _selfCreate = true;
-            }
-            Interlocked.CompareExchange(ref _isRunning, 1, 0);
-
-            if (_autoConfig)
-            {
-                using (var channelForConfig = _amqpConnection.CreateModel())
-                {
-                    foreach (var topic in _topics.Keys)
+                    var connFactory = new RabbitMQConnectionFactory
                     {
-                        var queueCount = _topics[topic];
-                        var subscribeQueues = GetSubscribeQueues(queueCount, _consumerCount, _consumerSequence);
-                        var subTopic = GetSubTopic(topic);
-                        channelForConfig.ExchangeDeclare(topic, ExchangeType.Fanout, true, false, null);
-                        channelForConfig.ExchangeDeclare(subTopic, ExchangeType.Direct, true, false, null);
-                        channelForConfig.ExchangeBind(subTopic, topic, "", null);
-
-                        for (byte queueIndex = 0; queueIndex < queueCount; queueIndex++)
-                        {
-                            string queueName = GetQueue(topic, queueIndex);
-                            channelForConfig.QueueDeclare(queueName, true, false, false, null);
-                            channelForConfig.QueueBind(queueName, subTopic, queueIndex.ToString(), null);
-                        }
-                    }
-                    channelForConfig.Close();
+                        Uri = _amqpUri
+                    };
+                    _amqpConnection = connFactory.CreateConnection(_clientName);
+                    _selfCreate = true;
                 }
-            }
 
-            if (_mode == ConsumeMode.Push)
-            {
-                ConsumeByPush();
-            }
-            else
-            {
-                ConsumeByPull();
+                if (_autoConfig)
+                {
+                    using (var channelForConfig = _amqpConnection.CreateModel())
+                    {
+                        foreach (var topic in _topics.Keys)
+                        {
+                            var queueCount = _topics[topic];
+                            var subscribeQueues = GetSubscribeQueues(queueCount, _consumerCount, _consumerSequence);
+                            var subTopic = GetSubTopic(topic);
+                            channelForConfig.ExchangeDeclare(topic, ExchangeType.Fanout, true, false, null);
+                            channelForConfig.ExchangeDeclare(subTopic, ExchangeType.Direct, true, false, null);
+                            channelForConfig.ExchangeBind(subTopic, topic, "", null);
+
+                            for (byte queueIndex = 0; queueIndex < queueCount; queueIndex++)
+                            {
+                                string queueName = GetQueue(topic, queueIndex);
+                                channelForConfig.QueueDeclare(queueName, true, false, false, null);
+                                channelForConfig.QueueBind(queueName, subTopic, queueIndex.ToString(), null);
+                            }
+                        }
+                        channelForConfig.Close();
+                    }
+                }
+
+                if (_mode == ConsumeMode.Push)
+                {
+                    ConsumeByPush();
+                }
+                else
+                {
+                    ConsumeByPull();
+                }
             }
         }
 
@@ -160,47 +158,52 @@ namespace RabbitMQTopic
         /// </summary>
         public void Shutdown()
         {
-            if (_isRunning == 0)
+            if (Interlocked.CompareExchange(ref _isRunning, 0, 1) == 1)
             {
-                return;
-            }
-            Interlocked.CompareExchange(ref _isRunning, 0, 1);
-            if (_amqpConnection != null)
-            {
-                if (_mode == ConsumeMode.Push)
+                Thread.Sleep(100);
+                if (_amqpConnection != null)
                 {
-                    foreach (var topic in _globalConsumers.Keys)
+                    if (_mode == ConsumeMode.Push)
                     {
-                        var consumers = _globalConsumers[topic];
-                        foreach (var queueIndex in consumers.Keys)
+                        foreach (var topic in _globalConsumers.Keys)
                         {
-                            var channel = consumers[queueIndex].Model;
-                            channel.Close(RabbitMQConstants.ConnectionForced, $"\"{topic}-{queueIndex}\"'s normal channel disposed");
+                            var consumers = _globalConsumers[topic];
+                            foreach (var queueIndex in consumers.Keys)
+                            {
+                                var channel = consumers[queueIndex].Model;
+                                if (channel.IsOpen)
+                                {
+                                    channel.Close(RabbitMQConstants.ConnectionForced, $"\"{topic}-{queueIndex}\"'s normal channel disposed");
+                                }
+                            }
+                            consumers.Clear();
                         }
-                        consumers.Clear();
+                        _globalConsumers.Clear();
                     }
-                    _globalConsumers.Clear();
-                }
-                else
-                {
-                    foreach (var topic in _globalChannels.Keys)
+                    else
                     {
-                        var channels = _globalChannels[topic];
-                        foreach (var queueIndex in channels.Keys)
+                        foreach (var topic in _globalChannels.Keys)
                         {
-                            var channel = channels[queueIndex].Item1;
-                            var consumerThread = channels[queueIndex].Item2;
-                            channel.Close(RabbitMQConstants.ConnectionForced, $"\"{topic}-{queueIndex}\"'s normal channel disposed");
+                            var channels = _globalChannels[topic];
+                            foreach (var queueIndex in channels.Keys)
+                            {
+                                var channel = channels[queueIndex].Item1;
+                                var consumerThread = channels[queueIndex].Item2;
+                                if (channel.IsOpen)
+                                {
+                                    channel.Close(RabbitMQConstants.ConnectionForced, $"\"{topic}-{queueIndex}\"'s normal channel disposed");
+                                }
+                            }
+                            channels.Clear();
                         }
-                        channels.Clear();
+                        _globalChannels.Clear();
                     }
-                    _globalChannels.Clear();
-                }
 
-                if (_selfCreate)
-                {
-                    _amqpConnection.Close();
-                    _amqpConnection = null;
+                    if (_selfCreate)
+                    {
+                        _amqpConnection.Close();
+                        _amqpConnection = null;
+                    }
                 }
             }
         }
@@ -253,7 +256,7 @@ namespace RabbitMQTopic
                             {
                                 Thread.Sleep(1000);
                             }
-                            
+
                             if (OnMessageReceived != null)
                             {
                                 var currentTopic = e.Exchange.IndexOf("-delayed") > 0 ? e.Exchange.Substring(0, e.Exchange.LastIndexOf("-delayed")) : e.Exchange;

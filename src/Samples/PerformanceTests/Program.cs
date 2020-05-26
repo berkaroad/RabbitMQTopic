@@ -14,7 +14,8 @@ namespace PerformanceTests
             var producer = new Producer(new ProducerSettings
             {
                 AmqpUri = new Uri("amqp://demo:123456@localhost/test"),
-                ClientName = "ProducerApp"
+                ClientName = "ProducerApp",
+                MaxChannelIdleDuration = 2
             });
             producer.RegisterTopic("CommandTopic", 4).Start();
 
@@ -37,7 +38,8 @@ namespace PerformanceTests
             spentTime = watch.ElapsedMilliseconds;
             Console.WriteLine(string.Empty);
             Console.WriteLine($"Send message completed, time spent: {spentTime}ms, message count: {messageCount}, throughput: {messageCount * 1000 / spentTime}tps.");
-            Thread.Sleep(500);
+            Thread.Sleep(3000);
+
             producer.Shutdown();
 
             var consumer = new Consumer(new ConsumerSettings

@@ -7,15 +7,15 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>Jerry Bai</Authors>
     <PackageProjectUrl>https://github.com/berkaroad/RabbitMQTopic</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/berkaroad/RabbitMQTopic</RepositoryUrl>
+    <RepositoryUrl>https://github.com/berkaroad/RabbitMQTopic.git</RepositoryUrl>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <PackageId>RabbitMQTopic</PackageId>
     <Title>RabbitMQTopic</Title>
-    <Version>1.2.2</Version>
+    <Version>1.2.3</Version>
     <AssemblyVersion>1.2.0</AssemblyVersion>
     <PackageTags>rabbitmq mq rocketmq topic</PackageTags>
     <Description>模拟RocketMQ的Topic方式的消息发送和接收。</Description>
-    <PackageReleaseNotes>1）IMessageTransportationContext 移除属性 DeliveryTag。
+    <PackageReleaseNotes>https://github.com/berkaroad/RabbitMQTopic
     </PackageReleaseNotes>
   </PropertyGroup>
 

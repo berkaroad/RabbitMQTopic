@@ -27,5 +27,10 @@ namespace RabbitMQTopic
         /// 发送消息超时时间（默认：3s）
         /// </summary>
         public int SendMsgTimeout { get; set; }
+
+        /// <summary>
+        /// 最大Channel空闲时长（默认：10s）
+        /// </summary>
+        public long MaxChannelIdleDuration { get; set; }
     }
 }

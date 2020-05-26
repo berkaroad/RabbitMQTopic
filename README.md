@@ -34,11 +34,11 @@ dotnet add package RabbitMQTopic
 以下数据，是在双核Mac笔记本上进行，dotnetcore和rabbitmq都在笔记本上，CPU消耗各占一半。
 
 ```
-Send message completed, time spent: 110272ms, message count: 100000, throughput: 906tps.
+Send message completed, time spent: 49678ms, message count: 100000, throughput: 2012tps.
 
-Consume message by push completed, time spent: 4399ms, message count: 52329, throughput: 11895tps.
+Consume message by push completed, time spent: 5912ms, message count: 52550, throughput: 8888tps.
 
-Consume message by pull completed, time spent: 8023ms, message count: 47674, throughput: 5942tps.
+Consume message by pull completed, time spent: 13446ms, message count: 47452, throughput: 3529tps.
 ```
 
 ## Topic 与 RabbitMQ 的映射关系
@@ -95,6 +95,11 @@ ExchangeBind("<TopicName>", "<TopicName>-delayed", "");
 ```
 
 ## 发布历史
+
+### 1.2.3
+1）使用Channel池，提升Producer发送消息性能，会定时回收长时间不使用的channel；
+
+2）优化Producer、Consumer的Start和Shutdown。
 
 ### 1.2.2
 1）IMessageTransportationContext 移除属性 DeliveryTag。
