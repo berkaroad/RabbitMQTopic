@@ -59,6 +59,10 @@ namespace RabbitMQTopic
             {
                 throw new ArgumentNullException("AmqpConnection or AmqpUri must be set.");
             }
+            if (settings.GroupName == "default")
+            {
+                throw new ArgumentException("GroupName cann't use reserve keywords \"default\".");
+            }
             _clientName = string.IsNullOrEmpty(settings.ClientName) ? "undefined consumer client" : settings.ClientName;
             _amqpUri = settings.AmqpUri;
             if (settings.AmqpConnection != null)
@@ -68,7 +72,7 @@ namespace RabbitMQTopic
             }
             _mode = settings.Mode;
             _prefetchCount = settings.PrefetchCount <= 0 ? (ushort)1 : (ushort)settings.PrefetchCount;
-            _groupName = string.IsNullOrEmpty(settings.GroupName) ? "default" : settings.GroupName;
+            _groupName = settings.GroupName == null ? string.Empty : settings.GroupName;
             _consumerCount = settings.ConsumerCount <= 0 ? 1 : settings.ConsumerCount;
             _consumerSequence = settings.ConsumerSequence <= 0 || settings.ConsumerSequence > _consumerCount ? 1 : settings.ConsumerSequence;
             _autoConfig = autoConfig;
@@ -421,12 +425,13 @@ namespace RabbitMQTopic
 
         private string GetSubTopic(string topic)
         {
-            return $"{topic}.G.{_groupName}";
+            var groupName = string.IsNullOrEmpty(_groupName) ? "default" : _groupName;
+            return $"{topic}.G.{groupName}";
         }
 
         private string GetQueue(string topic, int queueIndex)
         {
-            return $"{topic}.G.{_groupName}-{queueIndex}";
+            return $"{GetSubTopic(topic)}-{queueIndex}";
         }
 
         private IEnumerable<byte> GetSubscribeQueues(int queueCount, int consumerCount, int consumerSequence)

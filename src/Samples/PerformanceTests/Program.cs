@@ -11,11 +11,17 @@ namespace PerformanceTests
     {
         static void Main(string[] args)
         {
+            PerfTest(ConsumeMode.Push);
+            Thread.Sleep(1000);
+            PerfTest(ConsumeMode.Pull);
+        }
+
+        static void PerfTest(ConsumeMode consumeMode)
+        {
             var producer = new Producer(new ProducerSettings
             {
                 AmqpUri = new Uri("amqp://demo:123456@localhost/test"),
-                ClientName = "ProducerApp",
-                MaxChannelIdleDuration = 2
+                ClientName = "ProducerApp"
             });
             producer.RegisterTopic("CommandTopic", 4).Start();
 
@@ -38,22 +44,20 @@ namespace PerformanceTests
             spentTime = watch.ElapsedMilliseconds;
             Console.WriteLine(string.Empty);
             Console.WriteLine($"Send message completed, time spent: {spentTime}ms, message count: {messageCount}, throughput: {messageCount * 1000 / spentTime}tps.");
-            Thread.Sleep(3000);
-
             producer.Shutdown();
 
             var consumer = new Consumer(new ConsumerSettings
             {
                 AmqpUri = new Uri("amqp://demo:123456@localhost/test"),
                 ClientName = "ConsumerApp",
-                Mode = ConsumeMode.Push,
+                Mode = consumeMode,
                 PrefetchCount = 1000,
                 GroupName = "Group1"
             });
-            var consumeCount1 = 0;
+            var consumeCount = 0;
             consumer.OnMessageReceived += (sender, e) =>
             {
-                Interlocked.Increment(ref consumeCount1);
+                Interlocked.Increment(ref consumeCount);
                 e.Context.Ack();
             };
 
@@ -61,7 +65,7 @@ namespace PerformanceTests
             Thread.Sleep(500);
             watch.Restart();
             consumer.Start();
-            while (consumeCount1 < messageCount / 2)
+            while (consumeCount < messageCount)
             {
                 Thread.Sleep(1);
             }
@@ -69,35 +73,7 @@ namespace PerformanceTests
             Thread.Sleep(100);
             consumer.Shutdown();
             Console.WriteLine(string.Empty);
-            Console.WriteLine($"Consume message by push completed, time spent: {spentTime}ms, message count: {consumeCount1}, throughput: {consumeCount1 * 1000 / spentTime}tps.");
-
-
-            consumer = new Consumer(new ConsumerSettings
-            {
-                AmqpUri = new Uri("amqp://demo:123456@localhost/test"),
-                ClientName = "ConsumerApp",
-                Mode = ConsumeMode.Pull,
-                PrefetchCount = 1000,
-                GroupName = "Group1"
-            });
-            var consumeCount2 = 0;
-            consumer.OnMessageReceived += (sender, e) =>
-            {
-                Interlocked.Increment(ref consumeCount2);
-                e.Context.Ack();
-            };
-
-            consumer.Subscribe("CommandTopic", 4);
-            Thread.Sleep(500);
-            watch.Restart();
-            consumer.Start();
-            while (consumeCount1 + consumeCount2 < messageCount)
-            {
-                Thread.Sleep(1);
-            }
-            spentTime = watch.ElapsedMilliseconds;
-            Console.WriteLine(string.Empty);
-            Console.WriteLine($"Consume message by pull completed, time spent: {spentTime}ms, message count: {consumeCount2}, throughput: {consumeCount2 * 1000 / spentTime}tps.");
+            Console.WriteLine($"Consume message by {consumeMode} completed, time spent: {spentTime}ms, message count: {consumeCount}, throughput: {consumeCount * 1000 / spentTime}tps.");
 
             Thread.Sleep(1000);
             consumer.Shutdown();

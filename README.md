@@ -12,12 +12,6 @@
 
 ## 安装
 ```
-Install-Package RabbitMQTopic
-```
-
-或
-
-```
 dotnet add package RabbitMQTopic
 ```
 
@@ -34,11 +28,15 @@ dotnet add package RabbitMQTopic
 以下数据，是在双核Mac笔记本上进行，dotnetcore和rabbitmq都在笔记本上，CPU消耗各占一半。
 
 ```
-Send message completed, time spent: 49678ms, message count: 100000, throughput: 2012tps.
+berkaroad@bojiarongdeMacBook-Pro PerformanceTests % dotnet run -c Release
 
-Consume message by push completed, time spent: 5912ms, message count: 52550, throughput: 8888tps.
+Send message completed, time spent: 54057ms, message count: 100000, throughput: 1849tps.
 
-Consume message by pull completed, time spent: 13446ms, message count: 47452, throughput: 3529tps.
+Consume message by Push completed, time spent: 13867ms, message count: 100000, throughput: 7211tps.
+
+Send message completed, time spent: 50385ms, message count: 100000, throughput: 1984tps.
+
+Consume message by Pull completed, time spent: 23676ms, message count: 100000, throughput: 4223tps.
 ```
 
 ## Topic 与 RabbitMQ 的映射关系
@@ -95,6 +93,11 @@ ExchangeBind("<TopicName>", "<TopicName>-delayed", "");
 ```
 
 ## 发布历史
+
+### 1.2.4
+1）调整Consumer的GroupName的处理，默认为空字符串，但映射到Exchange、Queue时，默认用“default”来拼接；
+
+2）优化Producer的Channel池。
 
 ### 1.2.3
 1）使用Channel池，提升Producer发送消息性能，会定时回收长时间不使用的channel；

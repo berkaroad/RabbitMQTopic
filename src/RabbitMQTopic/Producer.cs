@@ -21,13 +21,14 @@ namespace RabbitMQTopic
         private IRabbitMQConnection _amqpConnection = null;
         private TimeSpan _sendMsgTimeout = TimeSpan.FromSeconds(3);
         private TimeSpan _maxIdleDuration = TimeSpan.FromSeconds(10);
-        private ConcurrentQueue<Tuple<DateTime, IRabbitMQChannel>> _channelPool;
+        private ConcurrentQueue<RabbitMQChannelWithActiveTime> _channelPool;
         private bool _selfCreate = false;
         private bool _delayedMessageEnabled = false;
         private bool _autoConfig = false;
         private Dictionary<string, int> _topics = new Dictionary<string, int>();
         private volatile int _isRunning = 0;
         private Timer _cleanIdleChannelTimer;
+        private int _cleanInterval = 1;
 
         /// <summary>
         /// 生产者
@@ -77,7 +78,7 @@ namespace RabbitMQTopic
             }
             _delayedMessageEnabled = delayedMessageEnabled;
             _autoConfig = autoConfig;
-            _channelPool = new ConcurrentQueue<Tuple<DateTime, IRabbitMQChannel>>();
+            _channelPool = new ConcurrentQueue<RabbitMQChannelWithActiveTime>();
             _cleanIdleChannelTimer = new Timer(ClearIdleChannel);
         }
 
@@ -144,7 +145,7 @@ namespace RabbitMQTopic
                         }
                     }
                 }
-                _cleanIdleChannelTimer.Change(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+                _cleanIdleChannelTimer.Change(TimeSpan.FromSeconds(_cleanInterval), TimeSpan.FromSeconds(_cleanInterval));
             }
         }
 
@@ -157,11 +158,11 @@ namespace RabbitMQTopic
             {
                 _cleanIdleChannelTimer.Change(Timeout.Infinite, Timeout.Infinite);
                 Thread.Sleep(100);
-                while (_channelPool.TryDequeue(out Tuple<DateTime, IRabbitMQChannel> item))
+                while (_channelPool.TryDequeue(out RabbitMQChannelWithActiveTime item))
                 {
-                    if (item.Item2.IsOpen)
+                    if (item.Channel.IsOpen)
                     {
-                        item.Item2.Close();
+                        item.Channel.Close();
                     }
                 }
                 if (_amqpConnection != null)
@@ -215,23 +216,23 @@ namespace RabbitMQTopic
             {
                 return new SendResult(SendStatus.Failed, null, $"Topic {message.Topic} not registered.");
             }
-            IRabbitMQChannel channel = null;
+            RabbitMQChannelWithActiveTime item = null;
             try
             {
                 var queueCount = _topics[message.Topic];
                 var queueId = string.IsNullOrEmpty(routingKey) ? 0 : (Crc16.GetHashCode(routingKey) % queueCount);
                 var messageId = Guid.NewGuid().ToString();
                 var createdTime = message.CreatedTime == DateTime.MinValue ? DateTime.Now : message.CreatedTime;
-                if (_channelPool.TryDequeue(out Tuple<DateTime, IRabbitMQChannel> item))
+                if (_channelPool.TryDequeue(out item))
                 {
-                    channel = item.Item2;
+                    item.RefreshActiveTime();
                 }
                 else
                 {
-                    channel = _amqpConnection.CreateModel();
-                    channel.ConfirmSelect();
+                    item = new RabbitMQChannelWithActiveTime(_amqpConnection.CreateModel());
+                    item.Channel.ConfirmSelect();
                 }
-                var properties = channel.CreateBasicProperties();
+                var properties = item.Channel.CreateBasicProperties();
                 properties.Persistent = true;
                 properties.ContentType = message.ContentType ?? string.Empty;
                 properties.MessageId = Guid.NewGuid().ToString();
@@ -244,12 +245,12 @@ namespace RabbitMQTopic
                         { "x-delay", message.DelayedMilliseconds }
                     };
                 }
-                channel.BasicPublish(exchange: _delayedMessageEnabled && message.DelayedMilliseconds > 0 ? $"{message.Topic}-delayed" : message.Topic,
+                item.Channel.BasicPublish(exchange: _delayedMessageEnabled && message.DelayedMilliseconds > 0 ? $"{message.Topic}-delayed" : message.Topic,
                                      routingKey: queueId.ToString(),
                                      mandatory: true,
                                      basicProperties: properties,
                                      body: message.Body);
-                if (!channel.WaitForConfirms(_sendMsgTimeout, out bool timedOut))
+                if (!item.Channel.WaitForConfirms(_sendMsgTimeout, out bool timedOut))
                 {
                     return new SendResult(timedOut ? SendStatus.Timeout : SendStatus.Failed, null, "Wait for confirms failed.");
                 }
@@ -262,9 +263,9 @@ namespace RabbitMQTopic
             }
             finally
             {
-                if (channel != null)
+                if (item != null)
                 {
-                    _channelPool.Enqueue(new Tuple<DateTime, IRabbitMQChannel>(DateTime.Now, channel));
+                    _channelPool.Enqueue(item);
                 }
             }
         }
@@ -274,15 +275,15 @@ namespace RabbitMQTopic
             _cleanIdleChannelTimer.Change(Timeout.Infinite, Timeout.Infinite);
             try
             {
-                if (_channelPool.TryPeek(out Tuple<DateTime, IRabbitMQChannel> item) && _isRunning == 1)
+                if (_channelPool.TryPeek(out RabbitMQChannelWithActiveTime item) && _isRunning == 1)
                 {
-                    if (item.Item1.Add(_maxIdleDuration) < DateTime.Now)
+                    if (item.ActiveTime.Add(_maxIdleDuration) < DateTime.Now)
                     {
-                        if (_channelPool.TryDequeue(out Tuple<DateTime, IRabbitMQChannel> removedItem))
+                        if (_channelPool.TryDequeue(out RabbitMQChannelWithActiveTime removedItem))
                         {
-                            if (removedItem.Item2.IsOpen)
+                            if (removedItem.Channel.IsOpen)
                             {
-                                removedItem.Item2.Close();
+                                removedItem.Channel.Close();
                             }
                         }
                     }
@@ -292,8 +293,26 @@ namespace RabbitMQTopic
             {
                 if (_isRunning == 1)
                 {
-                    _cleanIdleChannelTimer.Change(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+                    _cleanIdleChannelTimer.Change(TimeSpan.FromSeconds(_cleanInterval), TimeSpan.FromSeconds(_cleanInterval));
                 }
+            }
+        }
+
+        private class RabbitMQChannelWithActiveTime
+        {
+            public RabbitMQChannelWithActiveTime(IRabbitMQChannel channel)
+            {
+                Channel = channel;
+                ActiveTime = DateTime.Now;
+            }
+
+            public IRabbitMQChannel Channel { get; private set; }
+
+            public DateTime ActiveTime { get; private set; }
+
+            public void RefreshActiveTime()
+            {
+                ActiveTime = DateTime.Now;
             }
         }
     }
