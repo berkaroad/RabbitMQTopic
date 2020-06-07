@@ -30,13 +30,13 @@ dotnet add package RabbitMQTopic
 ```
 dotnet run --project src/Samples/PerformanceTests -c Release
 
-Send message completed, time spent: 77297ms, message count: 100000, throughput: 1293tps.
+Send message completed, time spent: 58375ms, message count: 100000, throughput: 1713tps.
 
-Consume message by Push completed, time spent: 16455ms, message count: 100000, throughput: 6077tps.
+Consume message by Push completed, time spent: 14022ms, message count: 100000, throughput: 7131tps.
 
-Send message completed, time spent: 62035ms, message count: 100000, throughput: 1611tps.
+Send message completed, time spent: 56270ms, message count: 100000, throughput: 1777tps.
 
-Consume message by Pull completed, time spent: 27584ms, message count: 100000, throughput: 3625tps.
+Consume message by Pull completed, time spent: 22765ms, message count: 100000, throughput: 4392tps.
 ```
 
 以下数据，是在8Core Mac笔记本上进行，dotnetcore和rabbitmq都在笔记本上。
