@@ -25,7 +25,7 @@ dotnet add package RabbitMQTopic
 
 性能测试，见 [PerformanceTests](src/Samples/PerformanceTests/Program.cs)
 
-以下数据，是在双核Mac笔记本上进行，dotnetcore和rabbitmq都在笔记本上，CPU消耗各占一半。
+以下数据，是在2Core Mac笔记本上进行，dotnetcore和rabbitmq都在笔记本上。
 
 ```
 berkaroad@bojiarongdeMacBook-Pro PerformanceTests % dotnet run -c Release
@@ -37,6 +37,20 @@ Consume message by Push completed, time spent: 13867ms, message count: 100000, t
 Send message completed, time spent: 50385ms, message count: 100000, throughput: 1984tps.
 
 Consume message by Pull completed, time spent: 23676ms, message count: 100000, throughput: 4223tps.
+```
+
+以下数据，是在8Core Mac笔记本上进行，dotnetcore和rabbitmq都在笔记本上。
+
+```
+berkaroad@bojiarongdeMacBook-Pro PerformanceTests % dotnet run -c Release
+
+Send message completed, time spent: 15220ms, message count: 100000, throughput: 6570tps.
+
+Consume message by Push completed, time spent: 8405ms, message count: 100000, throughput: 11897tps.
+
+Send message completed, time spent: 15489ms, message count: 100000, throughput: 6456tps.
+
+Consume message by Pull completed, time spent: 17743ms, message count: 100000, throughput: 5636tps.
 ```
 
 ## Topic 与 RabbitMQ 的映射关系
@@ -93,6 +107,13 @@ ExchangeBind("<TopicName>", "<TopicName>-delayed", "");
 ```
 
 ## 发布历史
+
+### 1.2.5
+1）修复CRC16算法的bug，解决路由不均匀问题；
+
+2）Producer的Channel池增加池大小限制，默认为1000;
+
+3）Producer的路由算法优化，由原来的取模运算改为位运算，提高性能.
 
 ### 1.2.4
 1）调整Consumer的GroupName的处理，默认为空字符串，但映射到Exchange、Queue时，默认用“default”来拼接；

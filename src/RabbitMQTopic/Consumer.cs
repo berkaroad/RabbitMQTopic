@@ -82,7 +82,7 @@ namespace RabbitMQTopic
         /// 订阅Topic
         /// </summary>
         /// <param name="topic"></param>
-        /// <param name="queueCount"></param>
+        /// <param name="queueCount">Topic的队列数（必须为2的幂）</param>
         /// <return></return>
         public Consumer Subscribe(string topic, int queueCount)
         {
@@ -97,6 +97,10 @@ namespace RabbitMQTopic
             if (queueCount <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(queueCount), queueCount, "QueueCount must greater than zero.");
+            }
+            if ((queueCount & (queueCount - 1)) != 0)
+            { 
+                throw new ArgumentOutOfRangeException(nameof(queueCount), queueCount, "QueueCount must be the power of 2.");
             }
             if (!_topics.ContainsKey(topic))
             {

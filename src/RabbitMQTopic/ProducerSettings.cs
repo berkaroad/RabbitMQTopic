@@ -32,5 +32,10 @@ namespace RabbitMQTopic
         /// 最大Channel空闲时长（默认：10s）
         /// </summary>
         public long MaxChannelIdleDuration { get; set; }
+
+        /// <summary>
+        /// 最大Channel池大小（默认：1000）
+        /// </summary>
+        public int MaxChannelPoolSize { get; set; }
     }
 }

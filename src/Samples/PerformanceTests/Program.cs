@@ -18,17 +18,20 @@ namespace PerformanceTests
 
         static void PerfTest(ConsumeMode consumeMode)
         {
+            var random = new Random();
+            var messageCount = 100000;
+            var bashSize = 1000;
+            var sendTaskList = new List<Task>();
+            var spentTime = 0L;
+
             var producer = new Producer(new ProducerSettings
             {
                 AmqpUri = new Uri("amqp://demo:123456@localhost/test"),
-                ClientName = "ProducerApp"
+                ClientName = "ProducerApp",
+                MaxChannelPoolSize = bashSize
             });
             producer.RegisterTopic("CommandTopic", 4).Start();
 
-            var random = new Random();
-            var messageCount = 100000;
-            var sendTaskList = new List<Task>();
-            var spentTime = 0L;
 
             var watch = Stopwatch.StartNew();
             for (var i = 0; i < messageCount; i++)
@@ -38,6 +41,11 @@ namespace PerformanceTests
                 var body = System.Text.Encoding.UTF8.GetBytes($"{i} message {messageId}");
                 var topicMessage = new Message("CommandTopic", 1, body, "text/json", tag: "System.String");
                 sendTaskList.Add(producer.SendMessageAsync(topicMessage, routingKey));
+                if ((i + 1) % bashSize == 0)
+                {
+                    Task.WaitAll(sendTaskList.ToArray());
+                    sendTaskList.Clear();
+                }
             }
             Task.WaitAll(sendTaskList.ToArray());
             sendTaskList.Clear();
@@ -71,11 +79,10 @@ namespace PerformanceTests
             }
             spentTime = watch.ElapsedMilliseconds;
             Thread.Sleep(100);
-            consumer.Shutdown();
             Console.WriteLine(string.Empty);
             Console.WriteLine($"Consume message by {consumeMode} completed, time spent: {spentTime}ms, message count: {consumeCount}, throughput: {consumeCount * 1000 / spentTime}tps.");
 
-            Thread.Sleep(1000);
+            Thread.Sleep(3000);
             consumer.Shutdown();
         }
     }

@@ -1,11 +1,11 @@
 all: pack
 
 test:
-	dotnet run --project src/Samples/ProducerApp
-	dotnet run --project src/Samples/ConsumerApp
+	dotnet run --project src/Samples/ProducerApp -c Release
+	dotnet run --project src/Samples/ConsumerApp -c Release
 
 perf:
-	dotnet run --project src/Samples/PerformanceTests
+	dotnet run --project src/Samples/PerformanceTests -c Release
 
 pack: build
 	mkdir -p `pwd`/packages

@@ -22,6 +22,8 @@ namespace RabbitMQTopic
         private TimeSpan _sendMsgTimeout = TimeSpan.FromSeconds(3);
         private TimeSpan _maxIdleDuration = TimeSpan.FromSeconds(10);
         private ConcurrentQueue<RabbitMQChannelWithActiveTime> _channelPool;
+        private int _maxChannelPoolSize = 1000;
+        private volatile int _channelPoolSize;
         private bool _selfCreate = false;
         private bool _delayedMessageEnabled = false;
         private bool _autoConfig = false;
@@ -76,6 +78,10 @@ namespace RabbitMQTopic
             {
                 _maxIdleDuration = TimeSpan.FromSeconds(settings.MaxChannelIdleDuration);
             }
+            if (settings.MaxChannelPoolSize > 0)
+            {
+                _maxChannelPoolSize = settings.MaxChannelPoolSize;
+            }
             _delayedMessageEnabled = delayedMessageEnabled;
             _autoConfig = autoConfig;
             _channelPool = new ConcurrentQueue<RabbitMQChannelWithActiveTime>();
@@ -86,7 +92,7 @@ namespace RabbitMQTopic
         /// 注册Topic
         /// </summary>
         /// <param name="topic"></param>
-        /// <param name="queueCount"></param>
+        /// <param name="queueCount">Topic的队列数（必须为2的幂）</param>
         /// <return></return>
         public Producer RegisterTopic(string topic, int queueCount)
         {
@@ -101,6 +107,10 @@ namespace RabbitMQTopic
             if (queueCount <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(queueCount), queueCount, "QueueCount must greater than zero.");
+            }
+            if ((queueCount & (queueCount - 1)) != 0)
+            { 
+                throw new ArgumentOutOfRangeException(nameof(queueCount), queueCount, "QueueCount must be the power of 2.");
             }
             if (!_topics.ContainsKey(topic))
             {
@@ -220,7 +230,7 @@ namespace RabbitMQTopic
             try
             {
                 var queueCount = _topics[message.Topic];
-                var queueId = string.IsNullOrEmpty(routingKey) ? 0 : (Crc16.GetHashCode(routingKey) % queueCount);
+                var queueId = string.IsNullOrEmpty(routingKey) ? 0 : (Crc16.GetHashCode(routingKey) & (queueCount - 1));
                 var messageId = Guid.NewGuid().ToString();
                 var createdTime = message.CreatedTime == DateTime.MinValue ? DateTime.Now : message.CreatedTime;
                 if (_channelPool.TryDequeue(out item))
@@ -229,8 +239,20 @@ namespace RabbitMQTopic
                 }
                 else
                 {
-                    item = new RabbitMQChannelWithActiveTime(_amqpConnection.CreateModel());
-                    item.Channel.ConfirmSelect();
+                    while (Interlocked.Increment(ref _channelPoolSize) > _maxChannelPoolSize)
+                    {
+                        Interlocked.Decrement(ref _channelPoolSize);
+                        if (_channelPool.TryDequeue(out item))
+                        {
+                            item.RefreshActiveTime();
+                            break;
+                        }
+                    }
+                    if (item == null)
+                    {
+                        item = new RabbitMQChannelWithActiveTime(_amqpConnection.CreateModel());
+                        item.Channel.ConfirmSelect();
+                    }
                 }
                 var properties = item.Channel.CreateBasicProperties();
                 properties.Persistent = true;
@@ -281,6 +303,7 @@ namespace RabbitMQTopic
                     {
                         if (_channelPool.TryDequeue(out RabbitMQChannelWithActiveTime removedItem))
                         {
+                            Interlocked.Decrement(ref _channelPoolSize);
                             if (removedItem.Channel.IsOpen)
                             {
                                 removedItem.Channel.Close();

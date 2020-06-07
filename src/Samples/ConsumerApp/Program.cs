@@ -44,7 +44,7 @@ namespace ConsumerApp
             consumer2.Start();
             Console.WriteLine("Consumer started!");
 
-            Thread.Sleep(1000);
+            Thread.Sleep(3000);
             consumer1.Shutdown();
             Console.WriteLine("Consumer1 shutdown!");
             consumer2.Shutdown();
