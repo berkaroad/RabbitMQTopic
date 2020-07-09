@@ -11,6 +11,9 @@ test-c:
 perf:
 	dotnet run --project src/Samples/PerformanceTests -c Release
 
+publish: pack
+	dotnet nuget push `pwd`/packages/RabbitMQTopic.1.2.6.nupkg --source "github"
+
 pack: build
 	mkdir -p `pwd`/packages
 	dotnet pack -c Release `pwd`/src/RabbitMQTopic/
