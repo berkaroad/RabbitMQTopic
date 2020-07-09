@@ -27,7 +27,7 @@ namespace RabbitMQTopic
         private bool _selfCreate = false;
         private bool _delayedMessageEnabled = false;
         private bool _autoConfig = false;
-        private Dictionary<string, int> _topics = new Dictionary<string, int>();
+        private Dictionary<string, Tuple<int, string[]>> _topics = new Dictionary<string, Tuple<int, string[]>>();
         private volatile int _isRunning = 0;
         private Timer _cleanIdleChannelTimer;
         private int _cleanInterval = 1;
@@ -96,6 +96,18 @@ namespace RabbitMQTopic
         /// <return></return>
         public Producer RegisterTopic(string topic, int queueCount)
         {
+            return RegisterTopic(topic, queueCount, null);
+        }
+
+        /// <summary>
+        /// 注册Topic
+        /// </summary>
+        /// <param name="topic"></param>
+        /// <param name="queueCount">Topic的队列数（必须为2的幂）</param>
+        /// <param name="consumerGroups">初始消费组列表</param>
+        /// <return></return>
+        public Producer RegisterTopic(string topic, int queueCount, string[] consumerGroups)
+        {
             if (_isRunning == 1)
             {
                 throw new NotSupportedException("Couldn't register topic when is running.");
@@ -109,12 +121,19 @@ namespace RabbitMQTopic
                 throw new ArgumentOutOfRangeException(nameof(queueCount), queueCount, "QueueCount must greater than zero.");
             }
             if ((queueCount & (queueCount - 1)) != 0)
-            { 
+            {
                 throw new ArgumentOutOfRangeException(nameof(queueCount), queueCount, "QueueCount must be the power of 2.");
             }
             if (!_topics.ContainsKey(topic))
             {
-                _topics.Add(topic, queueCount);
+                if (consumerGroups == null || consumerGroups.Length == 0)
+                {
+                    _topics.Add(topic, Tuple.Create(queueCount, new string[] { string.Empty }));
+                }
+                else
+                {
+                    _topics.Add(topic, Tuple.Create(queueCount, consumerGroups));
+                }
             }
             return this;
         }
@@ -140,17 +159,37 @@ namespace RabbitMQTopic
                 {
                     foreach (var topic in _topics.Keys)
                     {
+                        var queueCount = _topics[topic].Item1;
+                        var consumerGroups = _topics[topic].Item2;
+
                         using (var channelForConfig = _amqpConnection.CreateModel())
                         {
                             channelForConfig.ExchangeDeclare(topic, ExchangeType.Fanout, true, false, null);
                             if (_delayedMessageEnabled)
                             {
                                 channelForConfig.ExchangeDeclare($"{topic}-delayed", "x-delayed-message", true, false, new Dictionary<string, object>
-                            {
-                                { "x-delayed-type", ExchangeType.Fanout }
-                            });
+                                {
+                                    { "x-delayed-type", ExchangeType.Fanout }
+                                });
                                 channelForConfig.ExchangeBind(topic, $"{topic}-delayed", "", null);
                             }
+
+                            // 配置消费组相关的Exchange和Queue
+                            foreach (var consumerGroup in consumerGroups)
+                            {
+                                var subTopic = GetSubTopic(topic, consumerGroup);
+                                channelForConfig.ExchangeDeclare(topic, ExchangeType.Fanout, true, false, null);
+                                channelForConfig.ExchangeDeclare(subTopic, ExchangeType.Direct, true, false, null);
+                                channelForConfig.ExchangeBind(subTopic, topic, "", null);
+
+                                for (byte queueIndex = 0; queueIndex < queueCount; queueIndex++)
+                                {
+                                    string queueName = GetQueue(topic, consumerGroup, queueIndex);
+                                    channelForConfig.QueueDeclare(queueName, true, false, false, null);
+                                    channelForConfig.QueueBind(queueName, subTopic, queueIndex.ToString(), null);
+                                }
+                            }
+
                             channelForConfig.Close();
                         }
                     }
@@ -229,7 +268,7 @@ namespace RabbitMQTopic
             RabbitMQChannelWithActiveTime item = null;
             try
             {
-                var queueCount = _topics[message.Topic];
+                var queueCount = _topics[message.Topic].Item1;
                 var queueId = string.IsNullOrEmpty(routingKey) ? 0 : (Crc16.GetHashCode(routingKey) & (queueCount - 1));
                 var messageId = Guid.NewGuid().ToString();
                 var createdTime = message.CreatedTime == DateTime.MinValue ? DateTime.Now : message.CreatedTime;
@@ -319,6 +358,17 @@ namespace RabbitMQTopic
                     _cleanIdleChannelTimer.Change(TimeSpan.FromSeconds(_cleanInterval), TimeSpan.FromSeconds(_cleanInterval));
                 }
             }
+        }
+
+        private string GetSubTopic(string topic, string consumerGroup)
+        {
+            var groupName = string.IsNullOrEmpty(consumerGroup) ? "default" : consumerGroup;
+            return $"{topic}.G.{groupName}";
+        }
+
+        private string GetQueue(string topic, string consumerGroup, int queueIndex)
+        {
+            return $"{GetSubTopic(topic, consumerGroup)}-{queueIndex}";
         }
 
         private class RabbitMQChannelWithActiveTime

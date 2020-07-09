@@ -11,8 +11,7 @@
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <PackageId>RabbitMQTopic</PackageId>
     <Title>RabbitMQTopic</Title>
-    <Version>1.2.5</Version>
-    <AssemblyVersion>1.2.0</AssemblyVersion>
+    <Version>1.2.6</Version>
     <PackageTags>rabbitmq mq rocketmq topic</PackageTags>
     <Description>模拟RocketMQ的Topic方式的消息发送和接收。</Description>
     <PackageReleaseNotes>https://github.com/berkaroad/RabbitMQTopic

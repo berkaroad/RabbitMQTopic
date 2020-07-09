@@ -1,7 +1,11 @@
 all: pack
 
-test:
+test: test-p test-c
+
+test-p:
 	dotnet run --project src/Samples/ProducerApp -c Release
+
+test-c:
 	dotnet run --project src/Samples/ConsumerApp -c Release
 
 perf:

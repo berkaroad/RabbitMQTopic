@@ -14,7 +14,7 @@ namespace ProducerApp
                 SendMsgTimeout = 1000,
             }, false);
 
-            producer.RegisterTopic("CommandTopic", 4).Start();
+            producer.RegisterTopic("CommandTopic", 4, new string[] { string.Empty, "Group1" }).Start();
             Console.WriteLine("Producer started!");
             var random = new Random();
             for (var i = 1; i <= 10; i++)

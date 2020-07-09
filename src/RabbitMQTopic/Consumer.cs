@@ -133,7 +133,6 @@ namespace RabbitMQTopic
                         foreach (var topic in _topics.Keys)
                         {
                             var queueCount = _topics[topic];
-                            var subscribeQueues = GetSubscribeQueues(queueCount, _consumerCount, _consumerSequence);
                             var subTopic = GetSubTopic(topic);
                             channelForConfig.ExchangeDeclare(topic, ExchangeType.Fanout, true, false, null);
                             channelForConfig.ExchangeDeclare(subTopic, ExchangeType.Direct, true, false, null);
