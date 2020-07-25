@@ -5,9 +5,11 @@ namespace RabbitMQTopic.Internals
     /// <summary>
     /// DateTime和UnixTime间互转
     /// </summary>
-    internal class DateTime2UnixTime
-    {        
-        private static readonly DateTime _startTime = TimeZoneInfo.ConvertTime(new DateTime(1970, 1, 1), TimeZoneInfo.Local);
+    internal static class DateTime2UnixTime
+    {
+        private static readonly DateTime _startTime =
+            TimeZoneInfo.ConvertTime(new DateTime(1970, 1, 1), TimeZoneInfo.Local);
+
         /// <summary>
         /// 将Unix时间戳转换为DateTime类型时间
         /// </summary>

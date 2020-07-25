@@ -46,7 +46,9 @@ namespace RabbitMQTopic
         /// <summary>
         /// Topic消息
         /// </summary>
-        public Message() { }
+        public Message()
+        {
+        }
 
         /// <summary>
         /// 消息
@@ -57,7 +59,9 @@ namespace RabbitMQTopic
         /// <param name="contentType"></param>
         /// <param name="tag"></param>
         public Message(string topic, int code, byte[] body, string contentType, string tag = null)
-            : this(topic, code, body, contentType, DateTime.Now, 0, tag) { }
+            : this(topic, code, body, contentType, DateTime.Now, 0, tag)
+        {
+        }
 
         /// <summary>
         /// 消息
@@ -69,7 +73,9 @@ namespace RabbitMQTopic
         /// <param name="createdTime"></param>
         /// <param name="tag"></param>
         public Message(string topic, int code, byte[] body, string contentType, DateTime createdTime, string tag = null)
-            : this(topic, code, body, contentType, createdTime, 0, tag) { }
+            : this(topic, code, body, contentType, createdTime, 0, tag)
+        {
+        }
 
         /// <summary>
         /// 消息
@@ -80,8 +86,11 @@ namespace RabbitMQTopic
         /// <param name="contentType"></param>
         /// <param name="delayedMilliseconds"></param>
         /// <param name="tag"></param>
-        public Message(string topic, int code, byte[] body, string contentType, int delayedMilliseconds, string tag = null)
-            : this(topic, code, body, contentType, DateTime.Now, delayedMilliseconds, tag) { }
+        public Message(string topic, int code, byte[] body, string contentType, int delayedMilliseconds,
+            string tag = null)
+            : this(topic, code, body, contentType, DateTime.Now, delayedMilliseconds, tag)
+        {
+        }
 
         /// <summary>
         /// 消息
@@ -93,20 +102,24 @@ namespace RabbitMQTopic
         /// <param name="createdTime"></param>
         /// <param name="delayedMilliseconds"></param>
         /// <param name="tag"></param>
-        public Message(string topic, int code, byte[] body, string contentType, DateTime createdTime, int delayedMilliseconds, string tag = null)
+        public Message(string topic, int code, byte[] body, string contentType, DateTime createdTime,
+            int delayedMilliseconds, string tag = null)
         {
             if (string.IsNullOrEmpty(topic))
             {
                 throw new ArgumentNullException(nameof(topic));
             }
+
             if (code <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(code), code, "Code must greater than zero.");
             }
+
             if (body == null)
             {
                 throw new ArgumentNullException(nameof(body));
             }
+
             Topic = topic;
             Code = code;
             Tag = tag;
@@ -122,7 +135,8 @@ namespace RabbitMQTopic
         /// <returns></returns>
         public override string ToString()
         {
-            return $"[Topic={Topic},Code={Code},Tag={Tag},CreatedTime={CreatedTime},DelayedMilliseconds={DelayedMilliseconds},BodyLength={Body.Length},ContentType={ContentType}]";
+            return
+                $"[Topic={Topic},Code={Code},Tag={Tag},CreatedTime={CreatedTime},DelayedMilliseconds={DelayedMilliseconds},BodyLength={Body.Length},ContentType={ContentType}]";
         }
     }
 }

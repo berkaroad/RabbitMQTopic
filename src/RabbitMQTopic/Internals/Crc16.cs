@@ -3,10 +3,11 @@ namespace RabbitMQTopic.Internals
     /// <summary>
     /// CRC16
     /// </summary>
-    internal class Crc16
+    internal static class Crc16
     {
         // 逆序CRC表
-        private static byte[] aucCRCHi = new byte[]  {
+        private static readonly byte[] _aucCrcHi = new byte[]
+        {
             0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41,
             0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1, 0x81, 0x40,
             0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41,
@@ -31,7 +32,8 @@ namespace RabbitMQTopic.Internals
             0x00, 0xC1, 0x81, 0x40
         };
 
-        private static byte[] aucCRCLo = new byte[] {
+        private static readonly byte[] _aucCrcLo = new byte[]
+        {
             0x00, 0xC0, 0xC1, 0x01, 0xC3, 0x03, 0x02, 0xC2, 0xC6, 0x06, 0x07, 0xC7,
             0x05, 0xC5, 0xC4, 0x04, 0xCC, 0x0C, 0x0D, 0xCD, 0x0F, 0xCF, 0xCE, 0x0E,
             0x0A, 0xCA, 0xCB, 0x0B, 0xC9, 0x09, 0x08, 0xC8, 0xD8, 0x18, 0x19, 0xD9,
@@ -71,21 +73,23 @@ namespace RabbitMQTopic.Internals
         /// </summary>
         /// <param name="bytes"></param>
         /// <returns></returns>
-        public static ushort GetHashCode(byte[] bytes)
+        private static ushort GetHashCode(byte[] bytes)
         {
             if (bytes == null || bytes.Length == 0)
             {
                 return 0;
             }
-            byte CRCHi = 0xFF;
-            byte CRCLo = 0xFF;
-            for (int i = 0; i < bytes.Length; i++)
+
+            byte crcHi = 0xFF;
+            byte crcLo = 0xFF;
+            foreach (var byt in bytes)
             {
-                var iIndex = (ushort)(CRCLo ^ (bytes[i]));
-                CRCLo = (byte)(CRCHi ^ aucCRCHi[iIndex]);
-                CRCHi = aucCRCLo[iIndex];
+                var iIndex = (ushort) (crcLo ^ byt);
+                crcLo = (byte) (crcHi ^ _aucCrcHi[iIndex]);
+                crcHi = _aucCrcLo[iIndex];
             }
-            return (ushort)(CRCHi << 8 | CRCLo);
+
+            return (ushort) (crcHi << 8 | crcLo);
         }
     }
 }

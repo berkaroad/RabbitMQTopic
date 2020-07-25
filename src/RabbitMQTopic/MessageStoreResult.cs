@@ -11,7 +11,9 @@ namespace RabbitMQTopic
         /// <summary>
         /// 消息存储结果
         /// </summary>
-        public MessageStoreResult() { }
+        public MessageStoreResult()
+        {
+        }
 
         /// <summary>
         /// 消息存储结果
@@ -22,7 +24,8 @@ namespace RabbitMQTopic
         /// <param name="queueId"></param>
         /// <param name="createdTime"></param>
         /// <param name="tag"></param>
-        public MessageStoreResult(string messageId, int code, string topic, int queueId, DateTime createdTime, string tag = null)
+        public MessageStoreResult(string messageId, int code, string topic, int queueId, DateTime createdTime,
+            string tag = null)
         {
             MessageId = messageId;
             Code = code;
@@ -74,7 +77,8 @@ namespace RabbitMQTopic
         /// <returns></returns>
         public override string ToString()
         {
-            return $"[MessageId={MessageId},Code={Code},Topic={Topic},Tag={Tag},QueueId={QueueId},CreatedTime={CreatedTime}]";
+            return
+                $"[MessageId={MessageId},Code={Code},Topic={Topic},Tag={Tag},QueueId={QueueId},CreatedTime={CreatedTime}]";
         }
     }
 }

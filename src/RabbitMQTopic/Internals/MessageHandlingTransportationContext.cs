@@ -9,7 +9,8 @@ namespace RabbitMQTopic.Internals
         private readonly IModel _channel;
         private readonly ulong _deliveryTag;
 
-        public MessageHandlingTransportationContext(string topic, int queueIndex, string groupName, IModel channel, ulong deliveryTag, IDictionary<string, object> properties)
+        public MessageHandlingTransportationContext(string topic, int queueIndex, string groupName, IModel channel,
+            ulong deliveryTag, IDictionary<string, object> properties)
         {
             Topic = topic;
             QueueIndex = queueIndex;

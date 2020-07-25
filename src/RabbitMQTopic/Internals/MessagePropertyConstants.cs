@@ -3,7 +3,7 @@
     /// <summary>
     /// 消息属性常量
     /// </summary>
-    internal class MessagePropertyConstants
+    internal static class MessagePropertyConstants
     {
         /// <summary>
         /// 消息ID（string）

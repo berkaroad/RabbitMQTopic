@@ -16,36 +16,24 @@ namespace RabbitMQTopic
     /// </summary>
     public class Producer
     {
-        private Uri _amqpUri = null;
-        private string _clientName = null;
+        private readonly Uri _amqpUri = null;
+        private readonly string _clientName = null;
         private IRabbitMQConnection _amqpConnection = null;
-        private TimeSpan _sendMsgTimeout = TimeSpan.FromSeconds(3);
-        private TimeSpan _maxIdleDuration = TimeSpan.FromSeconds(10);
-        private ConcurrentQueue<RabbitMQChannelWithActiveTime> _channelPool;
-        private int _maxChannelPoolSize = 1000;
+        private readonly TimeSpan _sendMsgTimeout = TimeSpan.FromSeconds(3);
+        private readonly TimeSpan _maxIdleDuration = TimeSpan.FromSeconds(10);
+        private readonly ConcurrentQueue<RabbitMQChannelWithActiveTime> _channelPool;
+        private readonly int _maxChannelPoolSize = 1000;
         private volatile int _channelPoolSize;
         private bool _selfCreate = false;
-        private bool _delayedMessageEnabled = false;
-        private bool _autoConfig = false;
-        private Dictionary<string, Tuple<int, string[]>> _topics = new Dictionary<string, Tuple<int, string[]>>();
+        private readonly bool _delayedMessageEnabled = false;
+        private readonly bool _autoConfig = false;
+
+        private readonly Dictionary<string, Tuple<int, string[]>> _topics =
+            new Dictionary<string, Tuple<int, string[]>>();
+
         private volatile int _isRunning = 0;
-        private Timer _cleanIdleChannelTimer;
-        private int _cleanInterval = 1;
-
-        /// <summary>
-        /// 生产者
-        /// </summary>
-        /// <param name="settings"></param>
-        public Producer(ProducerSettings settings)
-            : this(settings, false, true) { }
-
-        /// <summary>
-        /// 生产者
-        /// </summary>
-        /// <param name="settings"></param>
-        /// <param name="delayedMessageEnabled">延迟消息已启用（需启用插件 rabbitmq_delayed_message_exchange）</param>
-        public Producer(ProducerSettings settings, bool delayedMessageEnabled)
-            : this(settings, delayedMessageEnabled, true) { }
+        private readonly Timer _cleanIdleChannelTimer;
+        private readonly int _cleanInterval = 1;
 
         /// <summary>
         /// 生产者
@@ -53,16 +41,18 @@ namespace RabbitMQTopic
         /// <param name="settings"></param>
         /// <param name="delayedMessageEnabled">延迟消息已启用（需启用插件 rabbitmq_delayed_message_exchange）</param>
         /// <param name="autoConfig">自动建Exchange和Bind</param>
-        public Producer(ProducerSettings settings, bool delayedMessageEnabled, bool autoConfig)
+        public Producer(ProducerSettings settings, bool delayedMessageEnabled = false, bool autoConfig = true)
         {
             if (settings == null)
             {
                 throw new ArgumentNullException(nameof(settings));
             }
+
             if (settings.AmqpConnection == null && settings.AmqpUri == null)
             {
-                throw new ArgumentNullException("AmqpConnection or AmqpUri must be set.");
+                throw new ArgumentException("AmqpConnection or AmqpUri must be set.");
             }
+
             _clientName = string.IsNullOrEmpty(settings.ClientName) ? "undefined producer client" : settings.ClientName;
             _amqpUri = settings.AmqpUri;
             if (settings.AmqpConnection != null)
@@ -70,35 +60,28 @@ namespace RabbitMQTopic
                 _amqpConnection = settings.AmqpConnection;
                 _clientName = settings.AmqpConnection.ClientProvidedName;
             }
+
             if (settings.SendMsgTimeout > 0)
             {
                 _sendMsgTimeout = TimeSpan.FromSeconds(settings.SendMsgTimeout);
             }
+
             if (settings.MaxChannelIdleDuration > 0)
             {
                 _maxIdleDuration = TimeSpan.FromSeconds(settings.MaxChannelIdleDuration);
             }
+
             if (settings.MaxChannelPoolSize > 0)
             {
                 _maxChannelPoolSize = settings.MaxChannelPoolSize;
             }
+
             _delayedMessageEnabled = delayedMessageEnabled;
             _autoConfig = autoConfig;
             _channelPool = new ConcurrentQueue<RabbitMQChannelWithActiveTime>();
             _cleanIdleChannelTimer = new Timer(ClearIdleChannel);
         }
-
-        /// <summary>
-        /// 注册Topic
-        /// </summary>
-        /// <param name="topic"></param>
-        /// <param name="queueCount">Topic的队列数（必须为2的幂）</param>
-        /// <return></return>
-        public Producer RegisterTopic(string topic, int queueCount)
-        {
-            return RegisterTopic(topic, queueCount, null);
-        }
-
+        
         /// <summary>
         /// 注册Topic
         /// </summary>
@@ -106,35 +89,42 @@ namespace RabbitMQTopic
         /// <param name="queueCount">Topic的队列数（必须为2的幂）</param>
         /// <param name="consumerGroups">初始消费组列表</param>
         /// <return></return>
-        public Producer RegisterTopic(string topic, int queueCount, string[] consumerGroups)
+        public Producer RegisterTopic(string topic, int queueCount, string[] consumerGroups = null)
         {
             if (_isRunning == 1)
             {
                 throw new NotSupportedException("Couldn't register topic when is running.");
             }
+
             if (string.IsNullOrEmpty(topic))
             {
                 throw new ArgumentNullException(nameof(topic), "must not empty.");
             }
+
             if (queueCount <= 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(queueCount), queueCount, "QueueCount must greater than zero.");
+                throw new ArgumentOutOfRangeException(nameof(queueCount), queueCount,
+                    "QueueCount must greater than zero.");
             }
+
             if ((queueCount & (queueCount - 1)) != 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(queueCount), queueCount, "QueueCount must be the power of 2.");
+                throw new ArgumentOutOfRangeException(nameof(queueCount), queueCount,
+                    "QueueCount must be the power of 2.");
             }
+
             if (!_topics.ContainsKey(topic))
             {
                 if (consumerGroups == null || consumerGroups.Length == 0)
                 {
-                    _topics.Add(topic, Tuple.Create(queueCount, new string[] { string.Empty }));
+                    _topics.Add(topic, Tuple.Create(queueCount, new string[] {string.Empty}));
                 }
                 else
                 {
                     _topics.Add(topic, Tuple.Create(queueCount, consumerGroups));
                 }
             }
+
             return this;
         }
 
@@ -167,10 +157,11 @@ namespace RabbitMQTopic
                             channelForConfig.ExchangeDeclare(topic, ExchangeType.Fanout, true, false, null);
                             if (_delayedMessageEnabled)
                             {
-                                channelForConfig.ExchangeDeclare($"{topic}-delayed", "x-delayed-message", true, false, new Dictionary<string, object>
-                                {
-                                    { "x-delayed-type", ExchangeType.Fanout }
-                                });
+                                channelForConfig.ExchangeDeclare($"{topic}-delayed", "x-delayed-message", true, false,
+                                    new Dictionary<string, object>
+                                    {
+                                        {"x-delayed-type", ExchangeType.Fanout}
+                                    });
                                 channelForConfig.ExchangeBind(topic, $"{topic}-delayed", "", null);
                             }
 
@@ -194,7 +185,9 @@ namespace RabbitMQTopic
                         }
                     }
                 }
-                _cleanIdleChannelTimer.Change(TimeSpan.FromSeconds(_cleanInterval), TimeSpan.FromSeconds(_cleanInterval));
+
+                _cleanIdleChannelTimer.Change(TimeSpan.FromSeconds(_cleanInterval),
+                    TimeSpan.FromSeconds(_cleanInterval));
             }
         }
 
@@ -214,12 +207,14 @@ namespace RabbitMQTopic
                         item.Channel.Close();
                     }
                 }
+
                 if (_amqpConnection != null)
                 {
                     if (_selfCreate)
                     {
                         _amqpConnection.Close();
                     }
+
                     _amqpConnection = null;
                 }
             }
@@ -229,10 +224,7 @@ namespace RabbitMQTopic
         /// 是否正在运行
         /// </summary>
         /// <value></value>
-        public bool IsRunning
-        {
-            get { return _isRunning == 1; }
-        }
+        public bool IsRunning => _isRunning == 1;
 
         /// <summary>
         /// 发送消息（异步）
@@ -257,14 +249,17 @@ namespace RabbitMQTopic
             {
                 return new SendResult(SendStatus.Failed, null, "Couldn't send message when is not running.");
             }
+
             if (message == null)
             {
                 return new SendResult(SendStatus.Failed, null, "Message is null.");
             }
+
             if (!_topics.ContainsKey(message.Topic))
             {
                 return new SendResult(SendStatus.Failed, null, $"Topic {message.Topic} not registered.");
             }
+
             RabbitMQChannelWithActiveTime item = null;
             try
             {
@@ -287,12 +282,14 @@ namespace RabbitMQTopic
                             break;
                         }
                     }
+
                     if (item == null)
                     {
                         item = new RabbitMQChannelWithActiveTime(_amqpConnection.CreateModel());
                         item.Channel.ConfirmSelect();
                     }
                 }
+
                 var properties = item.Channel.CreateBasicProperties();
                 properties.Persistent = true;
                 properties.ContentType = message.ContentType ?? string.Empty;
@@ -303,19 +300,26 @@ namespace RabbitMQTopic
                 {
                     properties.Headers = new Dictionary<string, object>
                     {
-                        { "x-delay", message.DelayedMilliseconds }
+                        {"x-delay", message.DelayedMilliseconds}
                     };
                 }
-                item.Channel.BasicPublish(exchange: _delayedMessageEnabled && message.DelayedMilliseconds > 0 ? $"{message.Topic}-delayed" : message.Topic,
-                                     routingKey: queueId.ToString(),
-                                     mandatory: true,
-                                     basicProperties: properties,
-                                     body: message.Body);
+
+                item.Channel.BasicPublish(
+                    exchange: _delayedMessageEnabled && message.DelayedMilliseconds > 0
+                        ? $"{message.Topic}-delayed"
+                        : message.Topic,
+                    routingKey: queueId.ToString(),
+                    mandatory: true,
+                    basicProperties: properties,
+                    body: message.Body);
                 if (!item.Channel.WaitForConfirms(_sendMsgTimeout, out bool timedOut))
                 {
-                    return new SendResult(timedOut ? SendStatus.Timeout : SendStatus.Failed, null, "Wait for confirms failed.");
+                    return new SendResult(timedOut ? SendStatus.Timeout : SendStatus.Failed, null,
+                        "Wait for confirms failed.");
                 }
-                var storeResult = new MessageStoreResult(messageId, message.Code, message.Topic, queueId, createdTime, message.Tag);
+
+                var storeResult = new MessageStoreResult(messageId, message.Code, message.Topic, queueId, createdTime,
+                    message.Tag);
                 return new SendResult(SendStatus.Success, storeResult, null);
             }
             catch (Exception ex)
@@ -355,7 +359,8 @@ namespace RabbitMQTopic
             {
                 if (_isRunning == 1)
                 {
-                    _cleanIdleChannelTimer.Change(TimeSpan.FromSeconds(_cleanInterval), TimeSpan.FromSeconds(_cleanInterval));
+                    _cleanIdleChannelTimer.Change(TimeSpan.FromSeconds(_cleanInterval),
+                        TimeSpan.FromSeconds(_cleanInterval));
                 }
             }
         }

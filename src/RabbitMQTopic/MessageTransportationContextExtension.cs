@@ -15,7 +15,9 @@ namespace RabbitMQTopic
         /// <returns></returns>
         public static string GetMessageId(this IMessageTransportationContext context)
         {
-            return context.Properties.ContainsKey(MessagePropertyConstants.MESSAGE_ID) ? (string)context.Properties[MessagePropertyConstants.MESSAGE_ID] : "";
+            return context.Properties.ContainsKey(MessagePropertyConstants.MESSAGE_ID)
+                ? (string) context.Properties[MessagePropertyConstants.MESSAGE_ID]
+                : "";
         }
 
         /// <summary>
@@ -25,7 +27,9 @@ namespace RabbitMQTopic
         /// <returns></returns>
         public static string GetMessageType(this IMessageTransportationContext context)
         {
-            return context.Properties.ContainsKey(MessagePropertyConstants.MESSAGE_TYPE) ? (string)context.Properties[MessagePropertyConstants.MESSAGE_TYPE] : "";
+            return context.Properties.ContainsKey(MessagePropertyConstants.MESSAGE_TYPE)
+                ? (string) context.Properties[MessagePropertyConstants.MESSAGE_TYPE]
+                : "";
         }
 
         /// <summary>
@@ -35,7 +39,9 @@ namespace RabbitMQTopic
         /// <returns></returns>
         public static DateTime GetTimestamp(this IMessageTransportationContext context)
         {
-            return context.Properties.ContainsKey(MessagePropertyConstants.TIMESTAMP) ? (DateTime)context.Properties[MessagePropertyConstants.TIMESTAMP] : DateTime.Now;
+            return context.Properties.ContainsKey(MessagePropertyConstants.TIMESTAMP)
+                ? (DateTime) context.Properties[MessagePropertyConstants.TIMESTAMP]
+                : DateTime.Now;
         }
 
         /// <summary>
@@ -45,7 +51,9 @@ namespace RabbitMQTopic
         /// <returns></returns>
         public static string GetContentType(this IMessageTransportationContext context)
         {
-            return context.Properties.ContainsKey(MessagePropertyConstants.CONTENT_TYPE) ? (string)context.Properties[MessagePropertyConstants.CONTENT_TYPE] : "";
+            return context.Properties.ContainsKey(MessagePropertyConstants.CONTENT_TYPE)
+                ? (string) context.Properties[MessagePropertyConstants.CONTENT_TYPE]
+                : "";
         }
 
         /// <summary>
@@ -55,7 +63,9 @@ namespace RabbitMQTopic
         /// <returns></returns>
         public static byte[] GetBody(this IMessageTransportationContext context)
         {
-            return context.Properties.ContainsKey(MessagePropertyConstants.BODY) ? (byte[])context.Properties[MessagePropertyConstants.BODY] : null;
+            return context.Properties.ContainsKey(MessagePropertyConstants.BODY)
+                ? (byte[]) context.Properties[MessagePropertyConstants.BODY]
+                : null;
         }
 
         /// <summary>
@@ -65,7 +75,9 @@ namespace RabbitMQTopic
         /// <returns></returns>
         public static string GetRoutingKey(this IMessageTransportationContext context)
         {
-            return context.Properties.ContainsKey(MessagePropertyConstants.ROUTING_KEY) ? (string)context.Properties[MessagePropertyConstants.ROUTING_KEY] : "";
+            return context.Properties.ContainsKey(MessagePropertyConstants.ROUTING_KEY)
+                ? (string) context.Properties[MessagePropertyConstants.ROUTING_KEY]
+                : "";
         }
     }
 }
